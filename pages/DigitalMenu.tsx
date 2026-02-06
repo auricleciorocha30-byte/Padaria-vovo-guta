@@ -20,7 +20,6 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
   const [checkoutStep, setCheckoutStep] = useState<'cart' | 'details' | 'payment'>('cart');
   const [activeCategory, setActiveCategory] = useState('Todos');
   
-  // Checkout States
   const [orderType, setOrderType] = useState<OrderType>(tableNumber ? 'MESA' : 'BALCAO');
   const [manualTable, setManualTable] = useState(tableNumber || '');
   const [address, setAddress] = useState('');
@@ -55,28 +54,34 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
     if (orderType === 'ENTREGA' && !address) { alert('Informe o endereço de entrega'); return; }
     
     setIsSending(true);
-    const newOrder: Order = {
+    
+    // Construção robusta do pedido
+    const newOrder: any = {
       id: Math.random().toString(36).substr(2, 9),
       type: orderType,
-      tableNumber: orderType === 'MESA' ? manualTable : undefined,
       items: cart,
       status: 'PREPARANDO',
       total: cartTotal,
-      createdAt: Date.now(),
-      paymentMethod: payment,
-      deliveryAddress: orderType === 'ENTREGA' ? address : undefined,
-      notes,
-      changeFor: payment === 'DINHEIRO' && changeFor ? parseFloat(changeFor) : undefined
+      createdAt: new Date().toISOString(),
+      paymentMethod: payment
     };
+
+    // Adiciona campos apenas se existirem valores para evitar erros de banco de dados
+    if (orderType === 'MESA') newOrder.tableNumber = manualTable;
+    if (orderType === 'ENTREGA') newOrder.deliveryAddress = address;
+    if (notes.trim()) newOrder.notes = notes;
+    if (payment === 'DINHEIRO' && changeFor) newOrder.changeFor = parseFloat(changeFor);
 
     try {
         await addOrder(newOrder);
         setCart([]);
         setIsCartOpen(false);
         setCheckoutStep('cart');
-        alert('Pedido enviado com sucesso! Aguarde o preparo.');
-    } catch (err) {
-        alert('Erro ao enviar pedido. Verifique sua internet.');
+        alert('✅ Pedido enviado com sucesso! Aguarde o preparo.');
+    } catch (err: any) {
+        console.error("Erro detalhado:", err);
+        const errorMsg = err.message || "Verifique sua conexão";
+        alert(`❌ Erro ao enviar pedido: ${errorMsg}\n\nDica: Verifique se as permissões de acesso (RLS) estão configuradas no seu banco de dados.`);
     } finally {
         setIsSending(false);
     }
@@ -103,7 +108,6 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
       </header>
 
       <main className="max-w-4xl mx-auto px-4 py-8 space-y-8 pb-12">
-        {/* Filtro de Categorias */}
         <div className="sticky top-[96px] z-10 py-4 bg-[#fff5e1]/80 backdrop-blur-sm -mx-4 px-4 overflow-x-auto no-scrollbar flex gap-2">
             {categories.map(cat => (
               <button key={cat} onClick={() => setActiveCategory(cat)} className={`px-6 py-2 rounded-2xl whitespace-nowrap font-bold text-sm transition-all ${activeCategory === cat ? 'bg-[#3d251e] text-white shadow-lg' : 'bg-white text-gray-400 border border-gray-100'}`}>
@@ -112,7 +116,6 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
             ))}
         </div>
 
-        {/* Listagem de Produtos */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {filteredProducts.map(product => (
             <div key={product.id} className="bg-white rounded-[2rem] p-4 shadow-sm border border-gray-100 flex gap-4 items-center">
@@ -132,12 +135,13 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
         </div>
       </main>
 
-      {/* Modal de Finalização (Checkout) */}
       {isCartOpen && (
         <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-end sm:items-center justify-center p-4">
           <div className="bg-white w-full max-w-lg rounded-t-[3rem] sm:rounded-[3rem] overflow-hidden flex flex-col max-h-[90vh] shadow-2xl animate-slide-up">
             <div className="p-8 border-b flex items-center justify-between">
-              <h2 className="font-bold text-xl">{checkoutStep === 'cart' ? 'Carrinho' : checkoutStep === 'details' ? 'Onde você está?' : 'Como quer pagar?'}</h2>
+              <h2 className="font-bold text-xl">
+                {checkoutStep === 'cart' ? 'Carrinho' : checkoutStep === 'details' ? 'Entrega/Mesa' : 'Pagamento'}
+              </h2>
               <button onClick={() => setIsCartOpen(false)} className="p-2 text-gray-400 hover:bg-gray-100 rounded-full"><X size={24} /></button>
             </div>
 
@@ -202,7 +206,7 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
                         else if (checkoutStep === 'details') setCheckoutStep('payment');
                         else handleCheckout();
                     }}
-                    className={`flex-1 py-4 rounded-2xl font-bold text-white shadow-xl flex items-center justify-center gap-2 ${isWaitstaff ? 'bg-[#f68c3e]' : 'bg-[#3d251e]'}`}
+                    className={`flex-1 py-4 rounded-2xl font-bold text-white shadow-xl flex items-center justify-center gap-2 ${isWaitstaff ? 'bg-[#f68c3e]' : 'bg-[#3d251e]'} disabled:opacity-50`}
                   >
                     {isSending ? <Loader2 className="animate-spin"/> : checkoutStep === 'payment' ? 'Enviar Pedido' : 'Próximo'}
                   </button>

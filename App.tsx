@@ -3,20 +3,17 @@ import React, { useState, useEffect } from 'react';
 import { HashRouter, Routes, Route, Link, useLocation, Navigate, Outlet } from 'react-router-dom';
 import { 
   LayoutDashboard, 
-  Utensils, 
   ShoppingCart, 
-  Tv, 
   Settings, 
   PlusCircle, 
   LogOut,
-  UserRound,
   CalendarDays,
   Loader2,
   ShieldCheck
 } from 'lucide-react';
 import { supabase } from './lib/supabase.ts';
 import { Product, Order, StoreSettings, OrderStatus } from './types.ts';
-import { INITIAL_PRODUCTS, INITIAL_SETTINGS } from './constants.ts';
+import { INITIAL_SETTINGS } from './constants.ts';
 
 // Pages
 import AdminDashboard from './pages/AdminDashboard.tsx';
@@ -41,7 +38,6 @@ export default function App() {
   const [authLoading, setAuthLoading] = useState(true);
   const [isWaitstaff, setIsWaitstaff] = useState(false);
 
-  // Initial Fetch and Realtime Subscriptions
   useEffect(() => {
     const fetchInitialData = async () => {
       try {
@@ -63,13 +59,15 @@ export default function App() {
 
     fetchInitialData();
 
-    // REALTIME SUBSCRIPTIONS - REFINED FOR INSTANT SYNC
     const ordersChannel = supabase
       .channel('orders-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, (payload) => {
         if (payload.eventType === 'INSERT') {
-          setOrders(prev => [payload.new as Order, ...prev]);
-          // Opcional: Tocar som de novo pedido
+          setOrders(prev => {
+            const exists = prev.some(o => o.id === payload.new.id);
+            if (exists) return prev;
+            return [payload.new as Order, ...prev];
+          });
           try { new Audio('https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3').play(); } catch(e) {}
         } else if (payload.eventType === 'UPDATE') {
           setOrders(prev => prev.map(o => o.id === payload.new.id ? (payload.new as Order) : o));
@@ -92,7 +90,6 @@ export default function App() {
       })
       .subscribe();
 
-    // Auth Session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setAuthLoading(false);
@@ -110,11 +107,20 @@ export default function App() {
   }, []);
 
   const addOrder = async (order: Order) => {
-    const { error } = await supabase.from('orders').insert(order);
+    // Garantir que a data está em um formato que o Supabase aceita bem
+    const orderToInsert = {
+        ...order,
+        createdAt: new Date().toISOString() // Mudando para ISOString para evitar erros de tipo numeric no SQL
+    };
+
+    const { error } = await supabase.from('orders').insert(orderToInsert);
     if (error) {
-      console.error('Error adding order:', error);
+      console.error('Supabase Error:', error);
       throw error;
     }
+    
+    // Atualiza o estado local imediatamente para feedback instantâneo
+    setOrders(prev => [orderToInsert as any, ...prev]);
   };
 
   const updateOrderStatus = async (id: string, status: OrderStatus) => {
@@ -123,10 +129,13 @@ export default function App() {
       console.error('Error updating order status:', error);
       throw error;
     }
+    // O realtime cuidará de atualizar a lista, mas podemos atualizar aqui também
+    setOrders(prev => prev.map(o => o.id === id ? { ...o, status } : o));
   };
 
   const handleUpdateSettings = async (newSettings: StoreSettings) => {
     await supabase.from('settings').upsert({ id: 'store', data: newSettings });
+    setSettings(newSettings);
   };
 
   const saveProduct = async (product: Product) => {
@@ -203,11 +212,11 @@ function AdminLayout({ settings }: { settings: StoreSettings }) {
       </aside>
       <main className="flex-1 overflow-auto bg-gray-50">
         <header className="bg-white h-16 border-b flex items-center justify-between px-8 sticky top-0 z-10 shadow-sm">
-          <h1 className="text-xl font-bold text-gray-800">{navItems.find(i => i.path === location.pathname)?.label || 'Vovó Guta'}</h1>
+          <h1 className="text-xl font-bold text-gray-800">{navItems.find(i => i.path === location.pathname)?.label || 'Atendimento'}</h1>
           <div className="flex items-center gap-3">
              <div className="text-right">
-                <p className="text-sm font-bold">Admin</p>
-                <p className="text-[10px] text-gray-400 uppercase">Unidade Matriz</p>
+                <p className="text-sm font-bold">Painel Admin</p>
+                <p className="text-[10px] text-gray-400 uppercase">Vovó Guta</p>
              </div>
              <img src={settings.logoUrl} className="w-10 h-10 rounded-full border border-gray-100" />
           </div>
