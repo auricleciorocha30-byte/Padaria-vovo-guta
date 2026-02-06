@@ -1,6 +1,5 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
-// Added Outlet to the imports from react-router-dom
+import React, { useState, useEffect } from 'react';
 import { HashRouter, Routes, Route, Link, useLocation, Navigate, Outlet } from 'react-router-dom';
 import { 
   LayoutDashboard, 
@@ -9,34 +8,28 @@ import {
   Tv, 
   Settings, 
   PlusCircle, 
-  Users, 
-  Ticket,
-  Star,
-  ChevronRight,
   LogOut,
-  Menu as MenuIcon,
   UserRound,
   CalendarDays,
   Loader2,
-  ShieldCheck,
-  Printer
+  ShieldCheck
 } from 'lucide-react';
-import { supabase } from './lib/supabase';
-import { Product, Order, StoreSettings, Coupon, OrderStatus, OrderType } from './types';
-import { INITIAL_PRODUCTS, INITIAL_SETTINGS } from './constants';
+import { supabase } from './lib/supabase.ts';
+import { Product, Order, StoreSettings, OrderStatus } from './types.ts';
+import { INITIAL_PRODUCTS, INITIAL_SETTINGS } from './constants.ts';
 
 // Pages
-import AdminDashboard from './pages/AdminDashboard';
-import MenuManagement from './pages/MenuManagement';
-import OrdersList from './pages/OrdersList';
-import StoreSettingsPage from './pages/StoreSettingsPage';
-import DigitalMenu from './pages/DigitalMenu';
-import TVBoard from './pages/TVBoard';
-import TableLogin from './pages/TableLogin';
-import WaitressPanel from './pages/WaitressPanel';
-import WeeklyOffers from './pages/WeeklyOffers';
-import LoginPage from './pages/LoginPage';
-import WaitstaffManagement from './pages/WaitstaffManagement';
+import AdminDashboard from './pages/AdminDashboard.tsx';
+import MenuManagement from './pages/MenuManagement.tsx';
+import OrdersList from './pages/OrdersList.tsx';
+import StoreSettingsPage from './pages/StoreSettingsPage.tsx';
+import DigitalMenu from './pages/DigitalMenu.tsx';
+import TVBoard from './pages/TVBoard.tsx';
+import TableLogin from './pages/TableLogin.tsx';
+import WaitressPanel from './pages/WaitressPanel.tsx';
+import WeeklyOffers from './pages/WeeklyOffers.tsx';
+import LoginPage from './pages/LoginPage.tsx';
+import WaitstaffManagement from './pages/WaitstaffManagement.tsx';
 
 export default function App() {
   const [products, setProducts] = useState<Product[]>(INITIAL_PRODUCTS);
@@ -121,7 +114,7 @@ export default function App() {
         <Route path="/mesa/login" element={<TableLogin onLogin={(t) => { setActiveTable(t); setIsWaitstaff(false); }} />} />
         <Route path="/garconete" element={<WaitressPanel onSelectTable={(t) => { setActiveTable(t); setIsWaitstaff(true); }} />} />
         <Route path="/cardapio" element={<DigitalMenu products={products} categories={categories} settings={settings} orders={orders} addOrder={addOrder} tableNumber={activeTable} onLogout={() => { setActiveTable(null); setIsWaitstaff(false); }} isWaitstaff={isWaitstaff} />} />
-        <Route path="/tv" element={<TVBoard orders={orders} settings={settings} />} />
+        <Route path="/tv" element={<TVBoard orders={orders} settings={settings} products={products} />} />
       </Routes>
     </HashRouter>
   );
@@ -175,6 +168,7 @@ function AdminLayout({ settings }: { settings: StoreSettings }) {
             <CalendarDays size={20} />
             <span className="font-bold">Ofertas da Semana</span>
           </Link>
+          <div className="h-4"></div>
           <Link to="/garconete" target="_blank" className="flex items-center gap-3 p-3 rounded-lg bg-orange-600/20 text-orange-400 hover:bg-orange-600/30 transition-colors border border-orange-600/30">
             <UserRound size={20} />
             <span className="font-bold">Painel Garçonete</span>
@@ -190,7 +184,7 @@ function AdminLayout({ settings }: { settings: StoreSettings }) {
           
           <button 
             onClick={handleSignOut}
-            className="w-full flex items-center gap-3 p-3 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors text-sm font-bold"
+            className="w-full flex items-center gap-3 p-3 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors text-sm font-bold mt-4"
           >
             <LogOut size={18} />
             Sair do Admin
@@ -200,23 +194,23 @@ function AdminLayout({ settings }: { settings: StoreSettings }) {
 
       <main className="flex-1 overflow-auto">
         <header className="bg-white h-16 border-b flex items-center justify-between px-8 sticky top-0 z-10">
-          <h1 className="text-xl font-bold text-gray-800">
-            {location.pathname === '/garcom' ? 'Gerenciamento de Garçom' : 
-             navItems.find(i => i.path === location.pathname)?.label || 'Painel Administrativo'}
+          <h1 className="text-xl font-bold text-gray-800 uppercase tracking-tight">
+            {location.pathname === '/garcom' ? 'Gerenciamento de Equipe' : 
+             navItems.find(i => i.path === location.pathname)?.label || 'Vovó Guta Admin'}
           </h1>
           <div className="flex items-center gap-4">
             <div className="text-right">
               <p className="text-sm font-semibold text-gray-900">Gerente</p>
               <p className="text-xs text-gray-500">Unidade Matriz</p>
             </div>
-            <div className="w-10 h-10 rounded-full bg-gray-200 overflow-hidden">
+            <div className="w-10 h-10 rounded-full bg-gray-200 overflow-hidden shadow-inner">
                 <img src={settings.logoUrl} className="w-full h-full object-cover" />
             </div>
           </div>
         </header>
 
         <div className="p-8">
-          <React.Suspense fallback={<div>Carregando...</div>}>
+          <React.Suspense fallback={<div>Carregando componentes...</div>}>
             <Outlet />
           </React.Suspense>
         </div>

@@ -1,7 +1,8 @@
 
 import React, { useState, useMemo } from 'react';
-import { ShoppingCart, Star, Heart, Clock, Ticket, Check, MapPin, X, LogOut, MinusCircle, Info, ChevronLeft, Flame, Trash2, CheckCircle2 } from 'lucide-react';
+import { ShoppingCart, Star, Heart, Clock, Ticket, Check, MapPin, X, LogOut, MinusCircle, Info, ChevronLeft, Flame, Trash2, CheckCircle2, AlertTriangle, Minus, Plus as PlusIcon } from 'lucide-react';
 import { Product, StoreSettings, Order, OrderItem, OrderType } from '../types';
+import { supabase } from '../lib/supabase';
 
 interface Props {
   products: Product[];
@@ -18,6 +19,7 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
   const [cart, setCart] = useState<OrderItem[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [activeCategory, setActiveCategory] = useState('Todos');
+  const [isClosingTable, setIsClosingTable] = useState(false);
 
   const categories = useMemo(() => ['Todos', ...externalCategories], [externalCategories]);
   const filteredProducts = activeCategory === 'Todos' ? products : products.filter(p => p.category === activeCategory);
@@ -25,11 +27,15 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
   const today = new Date().getDay();
   const featuredProduct = useMemo(() => products.find(p => p.featuredDay === today && p.isActive), [products, today]);
 
-  // Find existing orders for this table (if in waitstaff mode)
+  // Find existing orders for this table
   const tableOrders = useMemo(() => {
     if (!tableNumber) return [];
-    return orders.filter(o => o.tableNumber === tableNumber && o.status !== 'ENTREGUE');
+    return orders.filter(o => o.tableNumber === tableNumber && o.status !== 'ENTREGUE' && o.status !== 'CANCELADO');
   }, [orders, tableNumber]);
+
+  const tableTotal = useMemo(() => {
+    return tableOrders.reduce((acc, order) => acc + order.total, 0);
+  }, [tableOrders]);
 
   const addToCart = (product: Product) => {
     if (!product.isActive) return;
@@ -65,35 +71,89 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
     alert('Pedido enviado com sucesso!');
   };
 
+  const handleFinishTable = async () => {
+    if (!isWaitstaff || !settings.canWaitstaffFinishOrder) return;
+    
+    const confirmClose = window.confirm(`Deseja fechar a mesa ${tableNumber}? Total: R$ ${tableTotal.toFixed(2)}`);
+    if (!confirmClose) return;
+
+    setIsClosingTable(true);
+    try {
+        const orderIds = tableOrders.map(o => o.id);
+        const { error } = await supabase
+            .from('orders')
+            .update({ status: 'ENTREGUE' })
+            .in('id', orderIds);
+
+        if (error) throw error;
+        
+        alert(`Mesa ${tableNumber} finalizada com sucesso!`);
+        onLogout();
+    } catch (err) {
+        alert('Erro ao finalizar mesa. Tente novamente.');
+        console.error(err);
+    } finally {
+        setIsClosingTable(false);
+    }
+  };
+
+  const handleCancelOrder = async (orderId: string) => {
+    if (!isWaitstaff || !settings.canWaitstaffCancelItems) return;
+    
+    if (window.confirm('Deseja realmente CANCELAR este pedido inteiro?')) {
+        const { error } = await supabase
+            .from('orders')
+            .update({ status: 'CANCELADO' })
+            .eq('id', orderId);
+        
+        if (error) alert('Erro ao cancelar pedido.');
+    }
+  };
+
+  const handleRemoveItemFromOrder = async (order: Order, itemIdx: number) => {
+    if (!isWaitstaff || !settings.canWaitstaffCancelItems) return;
+
+    if (!window.confirm('Remover este item do pedido?')) return;
+
+    const newItems = [...order.items];
+    const removedItem = newItems.splice(itemIdx, 1)[0];
+    const newTotal = order.total - (removedItem.price * removedItem.quantity);
+
+    try {
+        if (newItems.length === 0) {
+            // If no items left, cancel the order
+            await supabase.from('orders').update({ status: 'CANCELADO' }).eq('id', order.id);
+        } else {
+            await supabase.from('orders').update({ items: newItems, total: newTotal }).eq('id', order.id);
+        }
+    } catch (err) {
+        alert('Erro ao excluir item.');
+        console.error(err);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[#fff5e1] text-[#3d251e]">
-      <header className="bg-[#3d251e] text-white p-6 sticky top-0 z-20 shadow-lg">
+      <header className={`sticky top-0 z-20 shadow-lg transition-colors ${isWaitstaff ? 'bg-[#f68c3e]' : 'bg-[#3d251e]'} text-white p-6`}>
         <div className="max-w-4xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <button 
-                onClick={onLogout}
-                className="p-2 hover:bg-white/10 rounded-full transition-colors mr-1"
-                title="Voltar / Trocar Mesa"
-            >
+            <button onClick={onLogout} className="p-2 hover:bg-white/10 rounded-full transition-colors mr-1">
                 <ChevronLeft size={24} />
             </button>
-            <img src={settings.logoUrl} alt="Logo" className="w-12 h-12 rounded-full border-2 border-[#f68c3e]" />
+            <img src={settings.logoUrl} alt="Logo" className="w-12 h-12 rounded-full border-2 border-white/20" />
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="font-brand text-xl font-bold">{settings.storeName}</h1>
                 {isWaitstaff && (
-                    <span className="bg-orange-500 text-[8px] font-bold uppercase px-2 py-0.5 rounded-full tracking-tighter">MODO GARÇONETE</span>
+                    <span className="bg-white text-[#f68c3e] text-[8px] font-bold uppercase px-2 py-0.5 rounded-full">MODO GARÇONETE</span>
                 )}
               </div>
-              <p className="text-xs text-orange-300 flex items-center gap-1">
-                <Clock size={12} /> {tableNumber ? `Mesa ${tableNumber}` : 'Balcão'}
+              <p className="text-xs opacity-80 flex items-center gap-1">
+                <Clock size={12} /> {tableNumber ? `Mesa ${tableNumber}` : 'Atendimento Balcão'}
               </p>
             </div>
           </div>
-          <button 
-            onClick={() => setIsCartOpen(true)}
-            className="relative p-2 bg-[#f68c3e] rounded-full text-white hover:scale-105 transition-transform"
-          >
+          <button onClick={() => setIsCartOpen(true)} className="relative p-2 bg-white/10 rounded-full hover:scale-105 transition-transform">
             <ShoppingCart size={24} />
             {cart.length > 0 && (
               <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] w-5 h-5 flex items-center justify-center rounded-full font-bold">
@@ -106,25 +166,60 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
 
       <main className="max-w-4xl mx-auto px-4 py-8 space-y-8 pb-24">
         
-        {/* Waitstaff Active Orders Summary */}
+        {/* Waitstaff Summary Section */}
         {isWaitstaff && tableOrders.length > 0 && (
-            <section className="bg-white rounded-[2rem] p-6 border-2 border-orange-100 shadow-sm">
-                <h3 className="font-bold mb-4 flex items-center gap-2 text-orange-600">
-                    <CheckCircle2 size={18} /> Pedidos Ativos nesta Mesa
-                </h3>
-                <div className="space-y-3">
+            <section className="bg-white rounded-[2rem] p-6 border-2 border-orange-200 shadow-md animate-scale-up">
+                <div className="flex justify-between items-start mb-6">
+                    <div>
+                        <h3 className="font-bold text-lg flex items-center gap-2 text-orange-600">
+                            <CheckCircle2 size={20} /> Pedidos da Mesa {tableNumber}
+                        </h3>
+                        <p className="text-xs text-gray-400">Total da mesa: <span className="text-gray-800 font-bold">R$ {tableTotal.toFixed(2)}</span></p>
+                    </div>
+                    {settings.canWaitstaffFinishOrder && (
+                        <button 
+                            onClick={handleFinishTable}
+                            disabled={isClosingTable}
+                            className="bg-green-600 text-white px-6 py-3 rounded-2xl font-bold text-sm shadow-lg shadow-green-600/20 hover:bg-green-700 active:scale-95 transition-all flex items-center gap-2"
+                        >
+                            {isClosingTable ? 'Processando...' : 'Fechar Mesa'}
+                            <CheckCircle2 size={18} />
+                        </button>
+                    )}
+                </div>
+
+                <div className="space-y-4">
                     {tableOrders.map(order => (
-                        <div key={order.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-2xl">
-                            <div className="flex-1">
-                                <p className="text-xs font-bold">#{order.id.slice(-4).toUpperCase()} - {order.status}</p>
-                                <p className="text-[10px] text-gray-500">{order.items.length} itens - R$ {order.total.toFixed(2)}</p>
+                        <div key={order.id} className="bg-gray-50 rounded-2xl border border-gray-100 overflow-hidden">
+                            <div className="p-4 flex items-center justify-between border-b border-gray-200">
+                                <div className="flex items-center gap-2">
+                                    <span className={`w-2 h-2 rounded-full ${order.status === 'PRONTO' ? 'bg-green-500' : 'bg-orange-400 animate-pulse'}`}></span>
+                                    <p className="text-xs font-bold text-gray-800 uppercase">PEDIDO #{order.id.slice(-4).toUpperCase()}</p>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <span className="text-sm font-bold">R$ {order.total.toFixed(2)}</span>
+                                    {settings.canWaitstaffCancelItems && (
+                                        <button onClick={() => handleCancelOrder(order.id)} className="p-1.5 text-red-400 hover:bg-red-50 rounded-lg">
+                                            <X size={16} />
+                                        </button>
+                                    )}
+                                </div>
                             </div>
-                            <div className="flex gap-2">
-                                {settings.canWaitstaffCancelItems && (
-                                    <button className="p-2 text-red-400 hover:bg-red-50 rounded-lg transition-colors">
-                                        <Trash2 size={18} />
-                                    </button>
-                                )}
+                            <div className="p-4 space-y-2">
+                                {order.items.map((it, idx) => (
+                                    <div key={idx} className="flex items-center justify-between text-xs">
+                                        <span className="text-gray-600 font-medium">{it.quantity}x {it.name}</span>
+                                        {settings.canWaitstaffCancelItems && (
+                                            <button 
+                                                onClick={() => handleRemoveItemFromOrder(order, idx)}
+                                                className="text-red-300 hover:text-red-500 p-1"
+                                                title="Excluir Item"
+                                            >
+                                                <Trash2 size={14} />
+                                            </button>
+                                        )}
+                                    </div>
+                                ))}
                             </div>
                         </div>
                     ))}
@@ -169,8 +264,8 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
                 onClick={() => setActiveCategory(cat)}
                 className={`px-6 py-2.5 rounded-2xl whitespace-nowrap font-bold transition-all ${
                   activeCategory === cat 
-                  ? 'bg-[#3d251e] text-white shadow-xl scale-105' 
-                  : 'bg-white text-gray-400 border border-gray-100 hover:border-[#f68c3e] hover:text-[#3d251e]'
+                  ? (isWaitstaff ? 'bg-[#f68c3e] text-white shadow-xl' : 'bg-[#3d251e] text-white shadow-xl') 
+                  : 'bg-white text-gray-400 border border-gray-100 hover:text-[#3d251e]'
                 }`}
               >
                 {cat}
@@ -184,11 +279,6 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
             <div key={product.id} className={`bg-white rounded-3xl p-5 shadow-sm border border-gray-100 flex gap-5 hover:shadow-xl transition-all duration-300 group ${!product.isActive ? 'opacity-70 bg-gray-50' : ''}`}>
               <div className="relative shrink-0">
                 <img src={product.imageUrl} className={`w-28 h-28 object-cover rounded-2xl group-hover:rotate-2 transition-transform ${!product.isActive ? 'grayscale' : ''}`} />
-                {!product.isActive && (
-                    <div className="absolute inset-0 bg-black/40 rounded-2xl flex items-center justify-center">
-                        <span className="text-white text-[10px] font-bold tracking-tighter text-center px-1">INDISPONÍVEL</span>
-                    </div>
-                )}
               </div>
               <div className="flex-1 flex flex-col justify-between">
                 <div>
@@ -197,38 +287,14 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
                 </div>
                 <div className="flex items-center justify-between mt-3">
                   <span className={`font-bold text-xl ${!product.isActive ? 'text-gray-400' : 'text-[#f68c3e]'}`}>R$ {product.price.toFixed(2)}</span>
-                  <button disabled={!product.isActive} onClick={() => addToCart(product)} className={`w-10 h-10 rounded-2xl flex items-center justify-center transition-all ${!product.isActive ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-[#3d251e] text-white hover:bg-black shadow-lg shadow-black/10'}`}>
-                    {product.isActive ? <PlusCircle size={20} /> : <MinusCircle size={20} />}
+                  <button disabled={!product.isActive} onClick={() => addToCart(product)} className={`w-10 h-10 rounded-2xl flex items-center justify-center transition-all ${!product.isActive ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : (isWaitstaff ? 'bg-[#f68c3e]' : 'bg-[#3d251e]') + ' text-white hover:scale-105 shadow-lg'}`}>
+                    <PlusIcon size={20} />
                   </button>
                 </div>
               </div>
             </div>
           ))}
         </div>
-
-        {!isWaitstaff && (
-            <section className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-orange-100 relative overflow-hidden">
-                <div className="absolute top-0 right-0 p-8 text-orange-50/30 pointer-events-none">
-                    <Star size={120} fill="currentColor" />
-                </div>
-                <div className="relative z-10">
-                    <div className="flex items-center gap-3 mb-6">
-                    <div className="p-2 bg-yellow-400 rounded-xl text-white shadow-lg">
-                        <Star size={20} fill="currentColor" />
-                    </div>
-                    <h2 className="font-bold text-xl text-[#3d251e]">Cartão Fidelidade</h2>
-                    </div>
-                    <div className="grid grid-cols-5 gap-3 mb-6">
-                    {[1,2,3,4,5,6,7,8,9,10].map(i => (
-                        <div key={i} className={`aspect-square rounded-2xl border-2 border-dashed flex items-center justify-center text-[10px] font-bold transition-all ${i <= 3 ? 'bg-orange-100 border-orange-500 text-orange-600 scale-105 shadow-inner' : 'border-gray-200 text-gray-300'}`}>
-                        {i <= 3 ? <Check size={20} strokeWidth={3} /> : i}
-                        </div>
-                    ))}
-                    </div>
-                    <p className="text-sm text-gray-500 text-center font-medium bg-gray-50 py-3 rounded-2xl">Faltam <span className="text-orange-600 font-bold">7 selos</span> para ganhar seu brinde especial! 🎁</p>
-                </div>
-            </section>
-        )}
       </main>
 
       {isCartOpen && (
@@ -236,10 +302,10 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
           <div className="bg-white w-full max-w-md rounded-t-[3rem] sm:rounded-[3rem] overflow-hidden animate-slide-up shadow-2xl">
             <div className="p-8 border-b flex items-center justify-between bg-gray-50/50">
               <h2 className="font-bold text-2xl flex items-center gap-3 text-[#3d251e]">
-                <div className="p-2 bg-orange-100 rounded-xl text-[#f68c3e]">
+                <div className={`p-2 rounded-xl text-white ${isWaitstaff ? 'bg-[#f68c3e]' : 'bg-[#3d251e]'}`}>
                   <ShoppingCart size={24} />
                 </div>
-                Carrinho
+                Seu Pedido
               </h2>
               <button onClick={() => setIsCartOpen(false)} className="p-2 hover:bg-gray-100 rounded-full transition-colors text-gray-400">
                 <X size={28} />
@@ -250,7 +316,7 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
               {cart.length === 0 ? (
                 <div className="text-center py-16 text-gray-400 space-y-4">
                   <ShoppingCart size={64} className="mx-auto opacity-10" />
-                  <p className="font-medium">Carrinho vazio</p>
+                  <p className="font-medium">O carrinho está vazio</p>
                 </div>
               ) : (
                 cart.map(item => (
@@ -258,7 +324,7 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
                     <div className="flex-1">
                       <h4 className="font-bold text-gray-800">{item.name}</h4>
                       <div className="flex items-center gap-2 mt-1">
-                        <span className="text-xs font-bold text-orange-600 bg-orange-100 px-2 py-0.5 rounded-lg">x{item.quantity}</span>
+                        <span className={`text-xs font-bold px-2 py-0.5 rounded-lg ${isWaitstaff ? 'bg-orange-100 text-orange-600' : 'bg-gray-200 text-gray-600'}`}>x{item.quantity}</span>
                         <span className="text-xs text-gray-400">R$ {(item.price * item.quantity).toFixed(2)}</span>
                       </div>
                     </div>
@@ -277,8 +343,8 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
                   <p className="text-3xl font-bold text-[#3d251e] tracking-tight">R$ {cartTotal.toFixed(2)}</p>
                 </div>
               </div>
-              <button disabled={cart.length === 0} onClick={checkout} className="w-full bg-[#3d251e] text-white py-5 rounded-3xl font-bold text-lg hover:bg-black transition-all shadow-xl active:scale-95">
-                Confirmar Pedido
+              <button disabled={cart.length === 0} onClick={checkout} className={`w-full py-5 rounded-3xl font-bold text-lg text-white transition-all shadow-xl active:scale-95 ${isWaitstaff ? 'bg-[#f68c3e] hover:bg-orange-600' : 'bg-[#3d251e] hover:bg-black'}`}>
+                Confirmar e Enviar
               </button>
             </div>
           </div>
@@ -294,9 +360,12 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
          </button>
          
          {isWaitstaff && settings.canWaitstaffFinishOrder ? (
-            <button className="flex flex-col items-center gap-1 group">
-                <div className="p-4 rounded-full bg-green-500 text-white shadow-lg shadow-green-500/20 -mt-8 border-4 border-white transition-all hover:scale-110">
-                <CheckCircle2 size={32} />
+            <button 
+                onClick={handleFinishTable}
+                className="flex flex-col items-center gap-1 group"
+            >
+                <div className="p-4 rounded-full bg-green-500 text-white shadow-lg shadow-green-500/20 -mt-8 border-4 border-white transition-all hover:scale-110 active:scale-90">
+                    <CheckCircle2 size={32} />
                 </div>
                 <p className="text-[10px] font-bold text-green-600">Fechar Mesa</p>
             </button>
@@ -310,7 +379,7 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
          )}
 
          <button onClick={onLogout} className="flex flex-col items-center gap-1 group">
-            <div className="p-2.5 rounded-2xl bg-red-50 group-hover:bg-red-500 text-red-400 group-hover:text-white transition-all shadow-sm">
+            <div className="p-2.5 rounded-2xl bg-red-50 group-hover:bg-red-500 text-red-400 group-hover:text-white transition-all">
               <LogOut size={24} />
             </div>
             <p className="text-[10px] font-bold text-gray-400 group-hover:text-red-500">Sair</p>
@@ -321,13 +390,3 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
 };
 
 export default DigitalMenu;
-
-function PlusCircle({ size }: { size: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="12" r="10" />
-      <line x1="12" x2="12" y1="8" y2="16" />
-      <line x1="8" x2="16" y1="12" y2="12" />
-    </svg>
-  );
-}
