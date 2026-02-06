@@ -30,9 +30,7 @@ const MenuManagement: React.FC<Props> = ({ products, saveProduct, deleteProduct,
     setIsSaving(true);
 
     try {
-        // Objeto formatado para o Supabase
-        // Nota: Removi 'isByWeight' do envio para evitar o erro de coluna inexistente no banco
-        const productData: any = {
+        const productData: Product = {
             id: editingProduct.id || Math.random().toString(36).substr(2, 9),
             name: editingProduct.name || '',
             description: editingProduct.description || '',
@@ -40,15 +38,16 @@ const MenuManagement: React.FC<Props> = ({ products, saveProduct, deleteProduct,
             category: editingProduct.category || categories[0] || 'Geral',
             imageUrl: editingProduct.imageUrl || 'https://picsum.photos/400/300',
             isActive: editingProduct.isActive !== false,
-            featuredDay: (editingProduct.featuredDay === -1 || editingProduct.featuredDay === undefined) ? null : Number(editingProduct.featuredDay)
+            featuredDay: (editingProduct.featuredDay === -1 || editingProduct.featuredDay === undefined) ? undefined : Number(editingProduct.featuredDay),
+            isByWeight: !!editingProduct.isByWeight
         };
 
-        await saveProduct(productData as Product);
+        await saveProduct(productData);
         setShowProductModal(false);
         setEditingProduct(null);
     } catch (err: any) {
         console.error('Falha ao salvar:', err);
-        alert(`Erro ao salvar: ${err.message}. Certifique-se que as colunas existem no Supabase.`);
+        alert(`Erro ao salvar: ${err.message}. Certifique-se que a coluna 'isByWeight' foi criada no SQL do Supabase.`);
     } finally {
         setIsSaving(false);
     }
@@ -142,22 +141,29 @@ const MenuManagement: React.FC<Props> = ({ products, saveProduct, deleteProduct,
                 <Trash2 size={16} />
               </button>
             </div>
-            {!product.isActive && (
-                <div className="absolute inset-0 bg-white/40 flex items-center justify-center z-10 pointer-events-none">
-                    <span className="bg-red-600 text-white text-[10px] font-black px-4 py-1 rounded-full shadow-lg rotate-12 uppercase">Fora de Estoque</span>
-                </div>
-            )}
+            
+            <div className="absolute top-2 left-2 flex flex-col gap-1 z-10">
+                {!product.isActive && (
+                    <span className="bg-red-600 text-white text-[8px] font-black px-2 py-1 rounded shadow-lg uppercase">Indisponível</span>
+                )}
+                {product.isByWeight && (
+                    <span className="bg-blue-600 text-white text-[8px] font-black px-2 py-1 rounded shadow-lg flex items-center gap-1 uppercase">
+                        <Weight size={10} /> Balança (KG)
+                    </span>
+                )}
+            </div>
+
             <img src={product.imageUrl} className="w-full h-40 object-cover" alt={product.name} />
             <div className="p-4">
               <div className="flex justify-between items-start">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-orange-600 bg-orange-50 px-2 py-1 rounded">
                     {product.category}
                   </span>
-                  {product.featuredDay !== null && product.featuredDay !== undefined && <Star size={14} className="text-yellow-500 fill-current" />}
+                  {product.featuredDay !== null && product.featuredDay !== undefined && product.featuredDay !== -1 && <Star size={14} className="text-yellow-500 fill-current" />}
               </div>
-              <h3 className="font-bold text-gray-800 mt-2">{product.name}</h3>
+              <h3 className="font-bold text-sm text-gray-800 mt-2">{product.name}</h3>
               <p className="text-xs text-gray-400 line-clamp-1 mb-1">{product.description}</p>
-              <p className="text-sm font-bold text-[#3d251e]">R$ {product.price.toFixed(2)}</p>
+              <p className="text-sm font-bold text-[#3d251e]">R$ {product.price.toFixed(2)} {product.isByWeight ? '/ KG' : ''}</p>
             </div>
           </div>
         ))}
@@ -220,6 +226,23 @@ const MenuManagement: React.FC<Props> = ({ products, saveProduct, deleteProduct,
               <button onClick={() => setShowProductModal(false)} className="text-gray-400 p-2 hover:bg-gray-100 rounded-full transition-colors"><X /></button>
             </div>
             <form onSubmit={handleSaveProduct} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto custom-scrollbar">
+              <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-orange-50 p-3 rounded-xl flex items-center justify-between border border-orange-100">
+                    <div className="flex items-center gap-2">
+                        <Power size={14} className={editingProduct?.isActive ? 'text-green-600' : 'text-gray-400'} />
+                        <span className="text-[10px] font-bold uppercase text-gray-500">Produto Ativo</span>
+                    </div>
+                    <Switch checked={editingProduct?.isActive ?? true} onChange={(v) => setEditingProduct({...editingProduct, isActive: v})} />
+                  </div>
+                  <div className="bg-blue-50 p-3 rounded-xl flex items-center justify-between border border-blue-100">
+                    <div className="flex items-center gap-2">
+                        <Weight size={14} className={editingProduct?.isByWeight ? 'text-blue-600' : 'text-gray-400'} />
+                        <span className="text-[10px] font-bold uppercase text-gray-500">Venda por KG</span>
+                    </div>
+                    <Switch checked={editingProduct?.isByWeight ?? false} onChange={(v) => setEditingProduct({...editingProduct, isByWeight: v})} />
+                  </div>
+              </div>
+
               <div className="flex gap-4 items-center">
                 <div className="w-24 h-24 bg-gray-100 rounded-xl flex flex-col items-center justify-center text-gray-400 border-2 border-dashed border-gray-200 cursor-pointer overflow-hidden relative">
                   {editingProduct?.imageUrl ? ( <img src={editingProduct.imageUrl} className="w-full h-full object-cover" alt="Preview" /> ) : ( <> <Camera size={24} /> <span className="text-[10px]">Foto</span> </> )}
@@ -232,35 +255,26 @@ const MenuManagement: React.FC<Props> = ({ products, saveProduct, deleteProduct,
                        }
                   }} />
                 </div>
-                <div className="flex-1 space-y-4">
-                  <div>
+                <div className="flex-1">
                     <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Nome do Produto *</label>
                     <input required type="text" value={editingProduct?.name || ''} onChange={(e) => setEditingProduct({...editingProduct, name: e.target.value})} className="w-full p-2 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-orange-500" />
-                  </div>
-                  <div className="flex items-center justify-between bg-orange-50 p-2 rounded-xl border border-orange-100">
-                    <div className="flex items-center gap-2">
-                        <Power size={14} className={editingProduct?.isActive ? 'text-green-600' : 'text-gray-400'} />
-                        <span className="text-[10px] font-bold uppercase text-gray-500">Produto Ativo</span>
-                    </div>
-                    <Switch checked={editingProduct?.isActive ?? true} onChange={(v) => setEditingProduct({...editingProduct, isActive: v})} />
-                  </div>
                 </div>
               </div>
               
               <div>
                 <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Descrição / Ingredientes</label>
                 <textarea 
-                  rows={3} 
+                  rows={2} 
                   value={editingProduct?.description || ''} 
                   onChange={(e) => setEditingProduct({...editingProduct, description: e.target.value})} 
                   className="w-full p-3 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-orange-500 resize-none text-sm" 
-                  placeholder="Descreva os ingredientes ou detalhes do produto..."
+                  placeholder="Ex: Pão fofinho feito com fermentação natural..."
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Preço (R$)</label>
+                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">{editingProduct?.isByWeight ? 'Preço por KG (R$)' : 'Preço Unitário (R$)'}</label>
                   <input required type="number" step="0.01" value={editingProduct?.price || ''} onChange={(e) => setEditingProduct({...editingProduct, price: parseFloat(e.target.value)})} className="w-full p-2 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-orange-500" />
                 </div>
                 <div>
@@ -272,7 +286,7 @@ const MenuManagement: React.FC<Props> = ({ products, saveProduct, deleteProduct,
               </div>
 
               <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Oferta do Dia (Destaque)</label>
+                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Oferta do Dia (Exibir em Destaque)</label>
                   <select 
                     value={editingProduct?.featuredDay ?? -1} 
                     onChange={(e) => setEditingProduct({...editingProduct, featuredDay: parseInt(e.target.value)})} 
@@ -286,7 +300,7 @@ const MenuManagement: React.FC<Props> = ({ products, saveProduct, deleteProduct,
               <div className="pt-4 flex gap-3">
                 <button type="button" onClick={() => setShowProductModal(false)} className="flex-1 py-3 text-gray-400 font-bold">Cancelar</button>
                 <button type="submit" disabled={isSaving} className="flex-1 py-3 bg-[#3d251e] text-white font-bold rounded-xl shadow-lg flex items-center justify-center gap-2"> 
-                    {isSaving ? <Loader2 className="animate-spin" size={20} /> : 'Salvar'} 
+                    {isSaving ? <Loader2 className="animate-spin" size={20} /> : 'Salvar Produto'} 
                 </button>
               </div>
             </form>
