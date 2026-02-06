@@ -6,7 +6,7 @@ import { ChefHat, CheckCircle2, Tv, Flame, Star, Calendar } from 'lucide-react';
 interface Props {
   orders: Order[];
   settings: StoreSettings;
-  products: Product[]; // Added products to show offers
+  products: Product[];
 }
 
 const TVBoard: React.FC<Props> = ({ orders, settings, products }) => {
@@ -17,8 +17,27 @@ const TVBoard: React.FC<Props> = ({ orders, settings, products }) => {
     return () => clearInterval(timer);
   }, []);
 
-  const preparing = useMemo(() => orders.filter(o => o.status === 'PREPARANDO').slice(0, 6), [orders]);
-  const ready = useMemo(() => orders.filter(o => o.status === 'PRONTO').slice(0, 6), [orders]);
+  // Agrupamento para TV: Somente IDs únicos de mesas ou pedidos
+  const { preparing, ready } = useMemo(() => {
+    const active = orders.filter(o => o.status === 'PREPARANDO' || o.status === 'PRONTO');
+    
+    const prepMap = new Set<string>();
+    const readyMap = new Set<string>();
+
+    active.forEach(o => {
+      const label = o.tableNumber ? `MESA ${o.tableNumber}` : `#${o.id.slice(-3).toUpperCase()}`;
+      if (o.status === 'PREPARANDO') prepMap.add(label);
+      if (o.status === 'PRONTO') readyMap.add(label);
+    });
+
+    // Se uma mesa está pronta em algum pedido, ela não deve aparecer em preparando se possível (limpeza visual)
+    readyMap.forEach(label => prepMap.delete(label));
+
+    return {
+      preparing: Array.from(prepMap).slice(0, 10),
+      ready: Array.from(readyMap).slice(0, 6)
+    };
+  }, [orders]);
   
   const today = currentTime.getDay();
   const todayOffer = useMemo(() => products.find(p => p.featuredDay === today && p.isActive), [products, today]);
@@ -52,13 +71,15 @@ const TVBoard: React.FC<Props> = ({ orders, settings, products }) => {
               <h2 className="text-2xl font-bold uppercase tracking-tight">Preparando</h2>
             </div>
             <div className="grid grid-cols-2 gap-4">
-              {preparing.map(order => (
-                <div key={order.id} className="p-4 bg-white/5 rounded-2xl text-center border border-white/5 animate-pulse">
-                  <span className="text-4xl font-bold text-gray-200">
-                     {order.tableNumber ? `MESA ${order.tableNumber}` : `#${order.id.slice(-3).toUpperCase()}`}
-                  </span>
-                </div>
-              ))}
+              {preparing.length === 0 ? (
+                <p className="col-span-2 text-center text-white/20 italic py-10">Aguardando novos pedidos...</p>
+              ) : (
+                preparing.map(label => (
+                  <div key={label} className="p-4 bg-white/5 rounded-2xl text-center border border-white/5 animate-pulse">
+                    <span className="text-4xl font-bold text-gray-200">{label}</span>
+                  </div>
+                ))
+              )}
             </div>
           </div>
 
@@ -69,18 +90,20 @@ const TVBoard: React.FC<Props> = ({ orders, settings, products }) => {
               <h2 className="text-2xl font-bold uppercase tracking-tight">Pronto</h2>
             </div>
             <div className="grid grid-cols-1 gap-4">
-              {ready.map(order => (
-                <div key={order.id} className="p-6 bg-white text-[#3d251e] rounded-2xl shadow-xl flex items-center justify-center animate-bounce">
-                  <span className="text-6xl font-bold">
-                     {order.tableNumber ? `MESA ${order.tableNumber}` : `#${order.id.slice(-3).toUpperCase()}`}
-                  </span>
-                </div>
-              ))}
+              {ready.length === 0 ? (
+                <p className="text-center text-white/50 italic py-10">Cozinha a todo vapor!</p>
+              ) : (
+                ready.map(label => (
+                  <div key={label} className="p-6 bg-white text-[#3d251e] rounded-2xl shadow-xl flex items-center justify-center animate-bounce">
+                    <span className="text-6xl font-bold">{label}</span>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>
 
-        {/* Lado Direito: Oferta do Dia (4 colunas) - SOLICITAÇÃO DO USUÁRIO */}
+        {/* Lado Direito: Oferta do Dia */}
         <div className="col-span-4 space-y-8">
           <div className="bg-gradient-to-b from-yellow-500 to-orange-600 rounded-[2.5rem] p-1 shadow-2xl h-full">
             <div className="bg-[#3d251e]/90 rounded-[2.3rem] h-full p-8 flex flex-col items-center text-center">
