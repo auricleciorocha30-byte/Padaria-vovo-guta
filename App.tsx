@@ -30,6 +30,12 @@ import WeeklyOffers from './pages/WeeklyOffers.tsx';
 import LoginPage from './pages/LoginPage.tsx';
 import WaitstaffManagement from './pages/WaitstaffManagement.tsx';
 
+// URLs dos sons de alerta
+const SOUNDS = {
+  NEW_ORDER: 'https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3', // Sino de notificação
+  ORDER_READY: 'https://assets.mixkit.co/active_storage/sfx/2218/2218-preview.mp3' // Ding de conclusão
+};
+
 export default function App() {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
@@ -39,6 +45,15 @@ export default function App() {
   const [session, setSession] = useState<any>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [isWaitstaff, setIsWaitstaff] = useState(false);
+
+  const playSound = (url: string) => {
+    try {
+      const audio = new Audio(url);
+      audio.play().catch(e => console.log('Interação do usuário necessária para áudio:', e));
+    } catch (e) {
+      console.error('Erro ao reproduzir som:', e);
+    }
+  };
 
   useEffect(() => {
     const fetchInitialData = async () => {
@@ -61,9 +76,9 @@ export default function App() {
 
     fetchInitialData();
 
-    // CONFIGURAÇÃO REALTIME SUPABASE
+    // CONFIGURAÇÃO REALTIME SUPABASE OTIMIZADA
     const channel = supabase
-      .channel('schema-db-changes')
+      .channel('vovo-guta-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, (payload) => {
         if (payload.eventType === 'INSERT') {
           const newOrder = payload.new as Order;
@@ -72,10 +87,19 @@ export default function App() {
             if (exists) return prev;
             return [newOrder, ...prev];
           });
-          // Feedback sonoro para novo pedido
-          try { new Audio('https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3').play(); } catch(e) {}
+          // ALERTA: NOVO PEDIDO
+          playSound(SOUNDS.NEW_ORDER);
         } else if (payload.eventType === 'UPDATE') {
-          setOrders(prev => prev.map(o => o.id === payload.new.id ? (payload.new as Order) : o));
+          const oldOrder = payload.old as Order;
+          const newOrder = payload.new as Order;
+          
+          setOrders(prev => prev.map(o => o.id === newOrder.id ? newOrder : o));
+
+          // ALERTA: PEDIDO FICOU PRONTO
+          // Verifica se o status mudou especificamente para 'PRONTO'
+          if (newOrder.status === 'PRONTO' && oldOrder.status !== 'PRONTO') {
+            playSound(SOUNDS.ORDER_READY);
+          }
         } else if (payload.eventType === 'DELETE') {
           setOrders(prev => prev.filter(o => o.id !== payload.old.id));
         }
@@ -103,10 +127,9 @@ export default function App() {
   }, []);
 
   const addOrder = async (order: Order) => {
-    // PROTEÇÃO CONTRA VALORES NULOS
     const payload = {
       id: order.id || Math.random().toString(36).substr(2, 9).toUpperCase(),
-      type: order.type || 'BALCAO', // Garante que nunca seja nulo
+      type: order.type || 'BALCAO',
       items: order.items,
       total: order.total,
       status: order.status || 'PREPARANDO',
@@ -118,7 +141,7 @@ export default function App() {
 
     const { error } = await supabase.from('orders').insert(payload);
     if (error) {
-      console.error("Erro Supabase:", error);
+      console.error("Erro Supabase ao adicionar pedido:", error);
       throw error;
     }
   };
@@ -185,12 +208,12 @@ function AdminLayout({ settings }: { settings: StoreSettings }) {
           </Link>
 
           <div className="pt-6 pb-2 px-3">
-              <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Atendimento Externo</p>
+              <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Acesso Externo</p>
           </div>
           
           <a href="#/cardapio" target="_blank" rel="noopener noreferrer" className="flex items-center justify-between p-3 rounded-xl hover:bg-white/5 text-gray-300 group">
             <div className="flex items-center gap-3">
-              <Utensils size={20} /> <span>Ver Cardápio</span>
+              <Utensils size={20} /> <span>Cardápio Digital</span>
             </div>
             <ExternalLink size={14} className="opacity-0 group-hover:opacity-100 transition-opacity" />
           </a>
