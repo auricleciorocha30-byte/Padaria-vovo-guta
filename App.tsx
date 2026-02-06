@@ -63,6 +63,7 @@ export default function App() {
 
     fetchInitialData();
 
+    // Sincronização em Tempo Real de Pedidos
     const ordersChannel = supabase
       .channel('orders-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, (payload) => {
@@ -81,6 +82,7 @@ export default function App() {
       })
       .subscribe();
 
+    // Sincronização em Tempo Real de Produtos
     const productsSubscription = supabase
       .channel('products-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, (payload) => {
@@ -111,22 +113,15 @@ export default function App() {
   }, []);
 
   const addOrder = async (order: Order) => {
-    // Tenta primeiro o insert completo
-    const { error: fullError } = await supabase.from('orders').insert(order);
+    // Tratamento para evitar erro de coluna inexistente (como paymentMethod se a tabela for antiga)
+    const orderData = { ...order };
     
-    if (fullError) {
-      console.warn('Erro no insert completo, tentando simplificado:', fullError.message);
-      
-      const simpleOrder = {
-        id: order.id,
-        items: order.items,
-        total: order.total,
-        status: order.status,
-        createdAt: order.createdAt,
-        type: order.type,
-        tableNumber: order.tableNumber
-      };
-      
+    const { error } = await supabase.from('orders').insert(orderData);
+    
+    if (error) {
+      console.warn('Erro ao inserir pedido completo, tentando modo simplificado:', error.message);
+      // Fallback: remove campos que podem não existir no schema do usuário
+      const { paymentMethod, type, ...simpleOrder } = orderData as any;
       const { error: simpleError } = await supabase.from('orders').insert(simpleOrder);
       if (simpleError) throw simpleError;
     }
@@ -194,7 +189,7 @@ function AdminLayout({ settings }: { settings: StoreSettings }) {
           </Link>
 
           <div className="pt-6 pb-2 px-3">
-              <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Painéis Externos</p>
+              <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Painéis Externos (Nova Guia)</p>
           </div>
           
           <a href="#/cardapio" target="_blank" rel="noopener noreferrer" className="flex items-center justify-between p-3 rounded-xl hover:bg-white/5 text-gray-300 group">

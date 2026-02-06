@@ -31,6 +31,7 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
 
   const categories = useMemo(() => ['Todos', ...externalCategories], [externalCategories]);
   
+  // Filtragem combinada: Categoria + Termo de Busca
   const filteredProducts = useMemo(() => {
     return products.filter(p => {
       const matchesCategory = activeCategory === 'Todos' || p.category === activeCategory;
@@ -86,7 +87,7 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
         if (isWaitstaff) onLogout();
     } catch (err: any) {
         console.error("Erro no envio:", err);
-        alert(`❌ Erro: ${err.message || "Falha ao conectar com o servidor"}`);
+        alert(`❌ Erro no envio. Verifique a conexão.`);
     } finally {
         setIsSending(false);
     }
@@ -94,12 +95,12 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
 
   return (
     <div className="min-h-screen bg-[#fff5e1] text-[#3d251e]">
-      <header className={`sticky top-0 z-20 shadow-lg ${isWaitstaff ? 'bg-[#f68c3e]' : 'bg-[#3d251e]'} text-white p-6 transition-colors duration-300`}>
+      <header className={`sticky top-0 z-20 shadow-lg ${isWaitstaff ? 'bg-[#f68c3e]' : 'bg-[#3d251e]'} text-white p-6 transition-colors`}>
         <div className="max-w-4xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <button onClick={onLogout} className="p-2 hover:bg-white/10 rounded-full transition-colors"><ChevronLeft size={24} /></button>
+            <button onClick={onLogout} className="p-2 hover:bg-white/10 rounded-full"><ChevronLeft size={24} /></button>
             <div className="flex flex-col">
-                <h1 className="font-brand text-lg font-bold leading-none">{isWaitstaff ? 'Atendimento Garçom' : settings.storeName}</h1>
+                <h1 className="font-brand text-lg font-bold leading-none">{isWaitstaff ? 'Modo Garçom' : settings.storeName}</h1>
                 <span className="text-[10px] opacity-70 uppercase tracking-widest mt-1">
                     {tableNumber ? `Mesa ${tableNumber}` : 'Cardápio Digital'}
                 </span>
@@ -113,12 +114,12 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
       </header>
 
       <main className="max-w-4xl mx-auto px-4 py-6 space-y-6">
-        {/* Barra de Pesquisa */}
+        {/* Busca com Lupa */}
         <div className="relative group">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-[#f68c3e] transition-colors" size={20} />
           <input 
             type="text" 
-            placeholder="O que você está procurando?" 
+            placeholder="Pesquisar produto..." 
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full pl-12 pr-4 py-4 bg-white border border-gray-100 rounded-2xl outline-none focus:ring-2 focus:ring-[#f68c3e]/20 focus:border-[#f68c3e] transition-all shadow-sm font-medium"
@@ -133,35 +134,37 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
         {/* Categorias */}
         <div className="flex gap-2 overflow-x-auto no-scrollbar py-2">
             {categories.map(cat => (
-              <button key={cat} onClick={() => { setActiveCategory(cat); setSearchTerm(''); }} className={`px-6 py-2 rounded-2xl whitespace-nowrap font-bold text-sm transition-all shadow-sm ${activeCategory === cat ? 'bg-[#3d251e] text-white border-[#3d251e]' : 'bg-white text-gray-400 border border-gray-100'}`}>
+              <button 
+                key={cat} 
+                onClick={() => { setActiveCategory(cat); setSearchTerm(''); }} 
+                className={`px-6 py-2 rounded-2xl whitespace-nowrap font-bold text-sm transition-all shadow-sm ${activeCategory === cat ? 'bg-[#3d251e] text-white' : 'bg-white text-gray-400 border border-gray-100'}`}
+              >
                 {cat}
               </button>
             ))}
         </div>
 
-        {/* Listagem de Produtos */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {filteredProducts.length > 0 ? filteredProducts.map(product => (
-            <div key={product.id} className="bg-white rounded-[2rem] p-4 shadow-sm flex gap-4 items-center border border-gray-50 hover:border-orange-100 transition-colors">
+        {/* Produtos */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pb-24">
+          {filteredProducts.map(product => (
+            <div key={product.id} className="bg-white rounded-[2rem] p-4 shadow-sm flex gap-4 items-center border border-gray-50">
               <img src={product.imageUrl} className="w-20 h-20 object-cover rounded-2xl" alt={product.name} />
               <div className="flex-1">
-                <h3 className="font-bold text-sm line-clamp-1">{product.name}</h3>
+                <h3 className="font-bold text-sm">{product.name}</h3>
                 <p className="text-[10px] text-gray-400 line-clamp-1">{product.description}</p>
                 <div className="flex items-center justify-between mt-3">
                   <span className="font-bold text-orange-600">R$ {product.price.toFixed(2)}</span>
-                  <button onClick={() => addToCart(product)} className={`w-8 h-8 rounded-xl text-white flex items-center justify-center transition-transform active:scale-90 ${isWaitstaff ? 'bg-[#f68c3e]' : 'bg-[#3d251e]'}`}>
+                  <button onClick={() => addToCart(product)} className={`w-8 h-8 rounded-xl text-white flex items-center justify-center ${isWaitstaff ? 'bg-[#f68c3e]' : 'bg-[#3d251e]'}`}>
                     <PlusIcon size={18} />
                   </button>
                 </div>
               </div>
             </div>
-          )) : (
-            <div className="col-span-full py-12 text-center space-y-3">
-                <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto text-gray-200">
-                    <Search size={32} />
-                </div>
-                <p className="text-gray-400 font-bold">Nenhum produto encontrado</p>
-                <button onClick={() => { setSearchTerm(''); setActiveCategory('Todos'); }} className="text-orange-600 text-xs font-bold uppercase">Limpar filtros</button>
+          ))}
+          {filteredProducts.length === 0 && (
+            <div className="col-span-full py-20 text-center text-gray-400">
+              <Search size={48} className="mx-auto mb-4 opacity-20" />
+              <p className="font-bold">Nenhum produto encontrado</p>
             </div>
           )}
         </div>
@@ -185,7 +188,7 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
                       <button onClick={() => removeFromCart(item.productId)} className="text-red-300"><Trash2 size={18} /></button>
                     </div>
                   ))}
-                  <textarea placeholder="Alguma observação? (ex: sem cebola)" value={notes} onChange={e => setNotes(e.target.value)} className="w-full p-4 bg-gray-50 border rounded-2xl outline-none focus:border-orange-500" />
+                  <textarea placeholder="Observações..." value={notes} onChange={e => setNotes(e.target.value)} className="w-full p-4 bg-gray-50 border rounded-2xl outline-none" />
                 </div>
               )}
 
@@ -195,26 +198,12 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
                     <div className="grid grid-cols-3 gap-2">
                         {['MESA', 'BALCAO', 'ENTREGA'].map(t => (
                             <button key={t} onClick={() => setOrderType(t as any)} className={`p-4 rounded-2xl border-2 text-[10px] font-bold ${orderType === t ? 'border-[#f68c3e] bg-orange-50 text-[#f68c3e]' : 'border-gray-50'}`}>
-                                {t === 'MESA' ? <Utensils size={18} className="mx-auto mb-1"/> : t === 'BALCAO' ? <ShoppingBag size={18} className="mx-auto mb-1"/> : <Truck size={18} className="mx-auto mb-1"/>}
                                 {t}
                             </button>
                         ))}
                     </div>
                   )}
                   {orderType === 'MESA' && !tableNumber && <input type="text" placeholder="Número da Mesa" value={manualTable} onChange={e => setManualTable(e.target.value)} className="w-full p-4 bg-gray-50 border rounded-2xl outline-none" />}
-                  {orderType === 'ENTREGA' && <textarea placeholder="Endereço de Entrega" value={address} onChange={e => setAddress(e.target.value)} className="w-full p-4 bg-gray-50 border rounded-2xl outline-none" />}
-                  
-                  {!isWaitstaff && (
-                    <div className="space-y-3">
-                        <p className="text-xs font-bold text-gray-400 uppercase">Pagamento</p>
-                        {['PIX', 'CARTAO', 'DINHEIRO'].map(p => (
-                            <button key={p} onClick={() => setPayment(p as any)} className={`w-full p-4 rounded-xl border-2 flex items-center gap-3 ${payment === p ? 'border-[#f68c3e] bg-orange-50 text-[#f68c3e]' : 'border-gray-50'}`}>
-                                {p === 'PIX' ? <QrCode size={18}/> : p === 'CARTAO' ? <CreditCard size={18}/> : <Banknote size={18}/>}
-                                <span className="font-bold text-sm">{p}</span>
-                            </button>
-                        ))}
-                    </div>
-                  )}
                 </div>
               )}
             </div>
@@ -228,10 +217,10 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
                   {checkoutStep !== 'cart' && <button onClick={() => setCheckoutStep('cart')} className="px-6 py-4 bg-white border rounded-2xl"><ChevronLeft/></button>}
                   <button 
                     disabled={cart.length === 0 || isSending}
-                    onClick={() => checkoutStep === 'cart' ? setCheckoutStep('details') : handleCheckout()}
+                    onClick={() => checkoutStep === 'cart' ? (isWaitstaff ? handleCheckout() : setCheckoutStep('details')) : handleCheckout()}
                     className={`flex-1 py-4 rounded-2xl font-bold text-white shadow-xl flex items-center justify-center gap-2 ${isWaitstaff ? 'bg-[#f68c3e]' : 'bg-[#3d251e]'} disabled:opacity-50`}
                   >
-                    {isSending ? <Loader2 className="animate-spin"/> : checkoutStep === 'cart' ? 'Próximo' : <><Send size={18}/> Enviar Pedido</>}
+                    {isSending ? <Loader2 className="animate-spin"/> : <><Send size={18}/> {isWaitstaff ? 'Lançar Mesa' : 'Enviar Pedido'}</>}
                   </button>
               </div>
             </div>
