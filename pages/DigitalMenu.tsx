@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { ShoppingCart, Clock, X, ChevronLeft, Trash2, Plus as PlusIcon, MapPin, CreditCard, Banknote, QrCode, Utensils, ShoppingBag, Truck, MessageSquare, Loader2, Send, Search } from 'lucide-react';
 import { Product, StoreSettings, Order, OrderItem, OrderType, PaymentMethod } from '../types';
 
@@ -31,7 +31,6 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
 
   const categories = useMemo(() => ['Todos', ...externalCategories], [externalCategories]);
   
-  // Filtragem combinada: Categoria + Termo de Busca
   const filteredProducts = useMemo(() => {
     return products.filter(p => {
       const matchesCategory = activeCategory === 'Todos' || p.category === activeCategory;
@@ -86,8 +85,9 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
         alert('✅ Pedido enviado com sucesso!');
         if (isWaitstaff) onLogout();
     } catch (err: any) {
-        console.error("Erro no envio:", err);
-        alert(`❌ Erro no envio. Verifique a conexão.`);
+        console.error("Erro fatal no envio:", err);
+        // Agora mostra o erro real para o usuário
+        alert(`❌ Erro no envio: ${err.message || "Verifique a conexão"}\n\nO sistema tentou enviar os dados básicos, mas o banco ainda rejeitou. Informe ao suporte.`);
     } finally {
         setIsSending(false);
     }
@@ -95,12 +95,12 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
 
   return (
     <div className="min-h-screen bg-[#fff5e1] text-[#3d251e]">
-      <header className={`sticky top-0 z-20 shadow-lg ${isWaitstaff ? 'bg-[#f68c3e]' : 'bg-[#3d251e]'} text-white p-6 transition-colors`}>
+      <header className={`sticky top-0 z-20 shadow-lg ${isWaitstaff ? 'bg-[#f68c3e]' : 'bg-[#3d251e]'} text-white p-6`}>
         <div className="max-w-4xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <button onClick={onLogout} className="p-2 hover:bg-white/10 rounded-full"><ChevronLeft size={24} /></button>
+            <button onClick={onLogout} className="p-2 hover:bg-white/10 rounded-full transition-colors"><ChevronLeft size={24} /></button>
             <div className="flex flex-col">
-                <h1 className="font-brand text-lg font-bold leading-none">{isWaitstaff ? 'Modo Garçom' : settings.storeName}</h1>
+                <h1 className="font-brand text-lg font-bold leading-none">{isWaitstaff ? 'Atendimento Garçom' : settings.storeName}</h1>
                 <span className="text-[10px] opacity-70 uppercase tracking-widest mt-1">
                     {tableNumber ? `Mesa ${tableNumber}` : 'Cardápio Digital'}
                 </span>
@@ -114,57 +114,61 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
       </header>
 
       <main className="max-w-4xl mx-auto px-4 py-6 space-y-6">
-        {/* Busca com Lupa */}
+        {/* Lupa de Busca em destaque */}
         <div className="relative group">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-[#f68c3e] transition-colors" size={20} />
+          <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-orange-500 transition-colors">
+            <Search size={22} />
+          </div>
           <input 
             type="text" 
-            placeholder="Pesquisar produto..." 
+            placeholder="O que você deseja buscar?" 
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-12 pr-4 py-4 bg-white border border-gray-100 rounded-2xl outline-none focus:ring-2 focus:ring-[#f68c3e]/20 focus:border-[#f68c3e] transition-all shadow-sm font-medium"
+            className="w-full pl-12 pr-4 py-4 bg-white border-2 border-transparent focus:border-orange-500 rounded-3xl outline-none shadow-sm font-medium transition-all"
           />
           {searchTerm && (
-              <button onClick={() => setSearchTerm('')} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-red-500">
-                <X size={18} />
+              <button onClick={() => setSearchTerm('')} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-300 hover:text-red-500">
+                <X size={20} />
               </button>
           )}
         </div>
 
-        {/* Categorias */}
+        {/* Categorias em scroll horizontal */}
         <div className="flex gap-2 overflow-x-auto no-scrollbar py-2">
             {categories.map(cat => (
               <button 
                 key={cat} 
                 onClick={() => { setActiveCategory(cat); setSearchTerm(''); }} 
-                className={`px-6 py-2 rounded-2xl whitespace-nowrap font-bold text-sm transition-all shadow-sm ${activeCategory === cat ? 'bg-[#3d251e] text-white' : 'bg-white text-gray-400 border border-gray-100'}`}
+                className={`px-6 py-2 rounded-2xl whitespace-nowrap font-bold text-sm transition-all shadow-sm border ${activeCategory === cat ? 'bg-[#3d251e] text-white border-[#3d251e]' : 'bg-white text-gray-400 border-gray-100 hover:border-gray-300'}`}
               >
                 {cat}
               </button>
             ))}
         </div>
 
-        {/* Produtos */}
+        {/* Listagem com animação suave */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pb-24">
-          {filteredProducts.map(product => (
-            <div key={product.id} className="bg-white rounded-[2rem] p-4 shadow-sm flex gap-4 items-center border border-gray-50">
-              <img src={product.imageUrl} className="w-20 h-20 object-cover rounded-2xl" alt={product.name} />
+          {filteredProducts.length > 0 ? filteredProducts.map(product => (
+            <div key={product.id} className="bg-white rounded-[2rem] p-4 shadow-sm flex gap-4 items-center border border-gray-50 hover:border-orange-100 transition-colors group">
+              <div className="relative overflow-hidden rounded-2xl shrink-0">
+                <img src={product.imageUrl} className="w-20 h-20 object-cover group-hover:scale-110 transition-transform duration-500" alt={product.name} />
+              </div>
               <div className="flex-1">
-                <h3 className="font-bold text-sm">{product.name}</h3>
-                <p className="text-[10px] text-gray-400 line-clamp-1">{product.description}</p>
-                <div className="flex items-center justify-between mt-3">
+                <h3 className="font-bold text-sm text-gray-800">{product.name}</h3>
+                <p className="text-[10px] text-gray-400 line-clamp-1 mb-2">{product.description}</p>
+                <div className="flex items-center justify-between">
                   <span className="font-bold text-orange-600">R$ {product.price.toFixed(2)}</span>
-                  <button onClick={() => addToCart(product)} className={`w-8 h-8 rounded-xl text-white flex items-center justify-center ${isWaitstaff ? 'bg-[#f68c3e]' : 'bg-[#3d251e]'}`}>
-                    <PlusIcon size={18} />
+                  <button onClick={() => addToCart(product)} className={`w-9 h-9 rounded-xl text-white flex items-center justify-center shadow-lg active:scale-90 transition-transform ${isWaitstaff ? 'bg-[#f68c3e]' : 'bg-[#3d251e]'}`}>
+                    <PlusIcon size={20} />
                   </button>
                 </div>
               </div>
             </div>
-          ))}
-          {filteredProducts.length === 0 && (
-            <div className="col-span-full py-20 text-center text-gray-400">
-              <Search size={48} className="mx-auto mb-4 opacity-20" />
-              <p className="font-bold">Nenhum produto encontrado</p>
+          )) : (
+            <div className="col-span-full py-20 text-center flex flex-col items-center gap-4 text-gray-300">
+                <Search size={64} className="opacity-10" />
+                <p className="font-bold uppercase tracking-widest text-xs">Produto não encontrado</p>
+                <button onClick={() => { setSearchTerm(''); setActiveCategory('Todos'); }} className="text-orange-500 font-bold text-xs">LIMPAR BUSCA</button>
             </div>
           )}
         </div>
@@ -175,7 +179,7 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
         <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-end sm:items-center justify-center p-4">
           <div className="bg-white w-full max-w-lg rounded-t-[3rem] sm:rounded-[3rem] overflow-hidden flex flex-col max-h-[90vh] shadow-2xl animate-slide-up">
             <div className="p-8 border-b flex items-center justify-between">
-              <h2 className="font-bold text-xl">{checkoutStep === 'cart' ? 'Itens' : 'Finalizar'}</h2>
+              <h2 className="font-bold text-xl">{checkoutStep === 'cart' ? 'Sacola' : 'Finalizar'}</h2>
               <button onClick={() => setIsCartOpen(false)} className="p-2 text-gray-400 hover:bg-gray-100 rounded-full"><X size={24} /></button>
             </div>
 
@@ -185,10 +189,10 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
                   {cart.map(item => (
                     <div key={item.productId} className="flex justify-between items-center bg-gray-50 p-4 rounded-2xl">
                       <div><p className="font-bold text-sm">{item.name}</p><p className="text-xs text-gray-400">{item.quantity}x R$ {item.price.toFixed(2)}</p></div>
-                      <button onClick={() => removeFromCart(item.productId)} className="text-red-300"><Trash2 size={18} /></button>
+                      <button onClick={() => removeFromCart(item.productId)} className="text-red-300 hover:text-red-600 transition-colors"><Trash2 size={18} /></button>
                     </div>
                   ))}
-                  <textarea placeholder="Observações..." value={notes} onChange={e => setNotes(e.target.value)} className="w-full p-4 bg-gray-50 border rounded-2xl outline-none" />
+                  <textarea placeholder="Alguma observação para o pedido?" value={notes} onChange={e => setNotes(e.target.value)} className="w-full p-4 bg-gray-50 border-2 border-gray-100 rounded-2xl outline-none focus:border-orange-500 transition-colors" />
                 </div>
               )}
 
@@ -197,28 +201,30 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
                   {!isWaitstaff && (
                     <div className="grid grid-cols-3 gap-2">
                         {['MESA', 'BALCAO', 'ENTREGA'].map(t => (
-                            <button key={t} onClick={() => setOrderType(t as any)} className={`p-4 rounded-2xl border-2 text-[10px] font-bold ${orderType === t ? 'border-[#f68c3e] bg-orange-50 text-[#f68c3e]' : 'border-gray-50'}`}>
+                            <button key={t} onClick={() => setOrderType(t as any)} className={`p-4 rounded-2xl border-2 text-[10px] font-bold transition-all ${orderType === t ? 'border-[#f68c3e] bg-orange-50 text-[#f68c3e]' : 'border-gray-50 text-gray-400'}`}>
+                                {t === 'MESA' ? <Utensils size={18} className="mx-auto mb-1"/> : t === 'BALCAO' ? <ShoppingBag size={18} className="mx-auto mb-1"/> : <Truck size={18} className="mx-auto mb-1"/>}
                                 {t}
                             </button>
                         ))}
                     </div>
                   )}
-                  {orderType === 'MESA' && !tableNumber && <input type="text" placeholder="Número da Mesa" value={manualTable} onChange={e => setManualTable(e.target.value)} className="w-full p-4 bg-gray-50 border rounded-2xl outline-none" />}
+                  {orderType === 'MESA' && !tableNumber && <input type="text" placeholder="Número da Mesa" value={manualTable} onChange={e => setManualTable(e.target.value)} className="w-full p-4 bg-gray-50 border-2 border-gray-100 rounded-2xl outline-none focus:border-orange-500 transition-colors" />}
+                  {orderType === 'ENTREGA' && <textarea placeholder="Endereço Completo" value={address} onChange={e => setAddress(e.target.value)} className="w-full p-4 bg-gray-50 border-2 border-gray-100 rounded-2xl outline-none focus:border-orange-500 transition-colors" />}
                 </div>
               )}
             </div>
 
             <div className="p-8 bg-gray-50 border-t">
               <div className="flex justify-between items-center mb-6">
-                <span className="text-gray-400 text-xs font-bold uppercase">Total</span>
+                <span className="text-gray-400 text-xs font-bold uppercase tracking-widest">Total do Pedido</span>
                 <span className="text-3xl font-brand font-bold">R$ {cartTotal.toFixed(2)}</span>
               </div>
               <div className="flex gap-2">
-                  {checkoutStep !== 'cart' && <button onClick={() => setCheckoutStep('cart')} className="px-6 py-4 bg-white border rounded-2xl"><ChevronLeft/></button>}
+                  {checkoutStep !== 'cart' && <button onClick={() => setCheckoutStep('cart')} className="px-6 py-4 bg-white border-2 border-gray-100 rounded-2xl hover:bg-gray-100 transition-colors"><ChevronLeft/></button>}
                   <button 
                     disabled={cart.length === 0 || isSending}
                     onClick={() => checkoutStep === 'cart' ? (isWaitstaff ? handleCheckout() : setCheckoutStep('details')) : handleCheckout()}
-                    className={`flex-1 py-4 rounded-2xl font-bold text-white shadow-xl flex items-center justify-center gap-2 ${isWaitstaff ? 'bg-[#f68c3e]' : 'bg-[#3d251e]'} disabled:opacity-50`}
+                    className={`flex-1 py-4 rounded-2xl font-bold text-white shadow-xl flex items-center justify-center gap-2 transition-all active:scale-95 ${isWaitstaff ? 'bg-[#f68c3e] hover:bg-orange-600' : 'bg-[#3d251e] hover:bg-black'} disabled:opacity-50 disabled:active:scale-100`}
                   >
                     {isSending ? <Loader2 className="animate-spin"/> : <><Send size={18}/> {isWaitstaff ? 'Lançar Mesa' : 'Enviar Pedido'}</>}
                   </button>

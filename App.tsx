@@ -63,7 +63,6 @@ export default function App() {
 
     fetchInitialData();
 
-    // Sincronização em Tempo Real de Pedidos
     const ordersChannel = supabase
       .channel('orders-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, (payload) => {
@@ -82,7 +81,6 @@ export default function App() {
       })
       .subscribe();
 
-    // Sincronização em Tempo Real de Produtos
     const productsSubscription = supabase
       .channel('products-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, (payload) => {
@@ -113,17 +111,24 @@ export default function App() {
   }, []);
 
   const addOrder = async (order: Order) => {
-    // Tratamento para evitar erro de coluna inexistente (como paymentMethod se a tabela for antiga)
-    const orderData = { ...order };
+    // Tenta o insert completo
+    const { error } = await supabase.from('orders').insert(order);
     
-    const { error } = await supabase.from('orders').insert(orderData);
-    
+    // Se der erro de coluna (comum quando o schema está desatualizado), tenta o mínimo necessário
     if (error) {
-      console.warn('Erro ao inserir pedido completo, tentando modo simplificado:', error.message);
-      // Fallback: remove campos que podem não existir no schema do usuário
-      const { paymentMethod, type, ...simpleOrder } = orderData as any;
-      const { error: simpleError } = await supabase.from('orders').insert(simpleOrder);
-      if (simpleError) throw simpleError;
+      console.warn('Erro no insert (colunas faltando?), tentando modo de compatibilidade:', error.message);
+      
+      const minimalOrder = {
+        id: order.id,
+        items: order.items,
+        total: order.total,
+        status: order.status,
+        createdAt: order.createdAt,
+        tableNumber: order.tableNumber || null
+      };
+      
+      const { error: retryError } = await supabase.from('orders').insert(minimalOrder);
+      if (retryError) throw retryError;
     }
   };
 
@@ -174,7 +179,7 @@ function AdminLayout({ settings }: { settings: StoreSettings }) {
           <img src={settings.logoUrl} alt="Logo" className="w-10 h-10 rounded-full object-cover border-2 border-orange-500" />
           <span className="font-brand text-lg font-bold">{settings.storeName}</span>
         </div>
-        <nav className="flex-1 p-4 space-y-1">
+        <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
           <Link to="/" className={`flex items-center gap-3 p-3 rounded-xl transition-all ${location.pathname === '/' ? 'bg-[#f68c3e]' : 'hover:bg-white/5'}`}>
             <LayoutDashboard size={20} /> Dashboard
           </Link>
@@ -189,7 +194,7 @@ function AdminLayout({ settings }: { settings: StoreSettings }) {
           </Link>
 
           <div className="pt-6 pb-2 px-3">
-              <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Painéis Externos (Nova Guia)</p>
+              <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Atendimento Externo</p>
           </div>
           
           <a href="#/cardapio" target="_blank" rel="noopener noreferrer" className="flex items-center justify-between p-3 rounded-xl hover:bg-white/5 text-gray-300 group">
