@@ -30,10 +30,9 @@ import WeeklyOffers from './pages/WeeklyOffers.tsx';
 import LoginPage from './pages/LoginPage.tsx';
 import WaitstaffManagement from './pages/WaitstaffManagement.tsx';
 
-// URLs dos sons de alerta
 const SOUNDS = {
-  NEW_ORDER: 'https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3', // Sino de notificação
-  ORDER_READY: 'https://assets.mixkit.co/active_storage/sfx/2218/2218-preview.mp3' // Ding de conclusão
+  NEW_ORDER: 'https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3',
+  ORDER_READY: 'https://assets.mixkit.co/active_storage/sfx/2218/2218-preview.mp3'
 };
 
 export default function App() {
@@ -49,10 +48,8 @@ export default function App() {
   const playSound = (url: string) => {
     try {
       const audio = new Audio(url);
-      audio.play().catch(e => console.log('Interação do usuário necessária para áudio:', e));
-    } catch (e) {
-      console.error('Erro ao reproduzir som:', e);
-    }
+      audio.play().catch(() => {});
+    } catch (e) {}
   };
 
   useEffect(() => {
@@ -70,44 +67,32 @@ export default function App() {
         if (oRes.data) setOrders(oRes.data);
         if (sRes.data) setSettings(sRes.data.data);
       } catch (err) {
-        console.error('Error fetching data:', err);
+        console.error('Erro ao buscar dados:', err);
       }
     };
 
     fetchInitialData();
 
-    // CONFIGURAÇÃO REALTIME SUPABASE OTIMIZADA
+    // CONFIGURAÇÃO REALTIME SUPABASE
     const channel = supabase
-      .channel('vovo-guta-realtime')
+      .channel('db-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, (payload) => {
         if (payload.eventType === 'INSERT') {
-          const newOrder = payload.new as Order;
-          setOrders(prev => {
-            const exists = prev.some(o => o.id === newOrder.id);
-            if (exists) return prev;
-            return [newOrder, ...prev];
-          });
-          // ALERTA: NOVO PEDIDO
-          playSound(SOUNDS.NEW_ORDER);
+          setOrders(prev => [payload.new as Order, ...prev]);
+          playSound(SOUNDS.NEW_ORDER); // Som de novo pedido
         } else if (payload.eventType === 'UPDATE') {
+          const updatedOrder = payload.new as Order;
           const oldOrder = payload.old as Order;
-          const newOrder = payload.new as Order;
           
-          setOrders(prev => prev.map(o => o.id === newOrder.id ? newOrder : o));
-
-          // ALERTA: PEDIDO FICOU PRONTO
-          // Verifica se o status mudou especificamente para 'PRONTO'
-          if (newOrder.status === 'PRONTO' && oldOrder.status !== 'PRONTO') {
+          setOrders(prev => prev.map(o => o.id === updatedOrder.id ? updatedOrder : o));
+          
+          // Som de pedido pronto (Se o status mudou para PRONTO agora)
+          if (updatedOrder.status === 'PRONTO' && oldOrder.status !== 'PRONTO') {
             playSound(SOUNDS.ORDER_READY);
           }
         } else if (payload.eventType === 'DELETE') {
           setOrders(prev => prev.filter(o => o.id !== payload.old.id));
         }
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, (payload) => {
-        if (payload.eventType === 'INSERT') setProducts(prev => [...prev, payload.new as Product]);
-        if (payload.eventType === 'UPDATE') setProducts(prev => prev.map(p => p.id === payload.new.id ? (payload.new as Product) : p));
-        if (payload.eventType === 'DELETE') setProducts(prev => prev.filter(p => p.id !== payload.old.id));
       })
       .subscribe();
 
@@ -127,21 +112,24 @@ export default function App() {
   }, []);
 
   const addOrder = async (order: Order) => {
-    const payload = {
-      id: order.id || Math.random().toString(36).substr(2, 9).toUpperCase(),
+    // Tratamento rigoroso para evitar erros de coluna no Supabase
+    const payload: any = {
+      id: order.id,
       type: order.type || 'BALCAO',
       items: order.items,
       total: order.total,
       status: order.status || 'PREPARANDO',
       createdAt: order.createdAt || Date.now(),
-      tableNumber: order.tableNumber || null,
       paymentMethod: order.paymentMethod || 'PIX',
-      notes: order.notes || null
     };
+
+    // Só envia estes campos se eles não forem nulos/vazios
+    if (order.tableNumber) payload.tableNumber = order.tableNumber;
+    if (order.notes) payload.notes = order.notes;
 
     const { error } = await supabase.from('orders').insert(payload);
     if (error) {
-      console.error("Erro Supabase ao adicionar pedido:", error);
+      console.error("Erro Supabase:", error);
       throw error;
     }
   };
@@ -151,19 +139,12 @@ export default function App() {
     if (error) throw error;
   };
 
-  if (authLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-[#fff5e1]">
-        <Loader2 className="animate-spin text-[#3d251e]" size={48} />
-      </div>
-    );
-  }
+  if (authLoading) return <div className="min-h-screen flex items-center justify-center bg-[#fff5e1]"><Loader2 className="animate-spin text-[#3d251e]" size={48} /></div>;
 
   return (
     <HashRouter>
       <Routes>
         <Route path="/login" element={session ? <Navigate to="/" /> : <LoginPage />} />
-
         <Route path="/" element={session ? <AdminLayout settings={settings} /> : <Navigate to="/login" />}>
           <Route index element={<AdminDashboard orders={orders} products={products} />} />
           <Route path="cardapio-admin" element={<MenuManagement products={products} saveProduct={async (p) => { await supabase.from('products').upsert(p); }} deleteProduct={async (id) => { await supabase.from('products').delete().eq('id', id); }} categories={categories} setCategories={setCategories} />} />
@@ -172,7 +153,6 @@ export default function App() {
           <Route path="ofertas" element={<WeeklyOffers products={products} saveProduct={async (p) => { await supabase.from('products').upsert(p); }} />} />
           <Route path="configuracoes" element={<StoreSettingsPage settings={settings} setSettings={async (s) => { await supabase.from('settings').upsert({ id: 'store', data: s }); setSettings(s); }} />} />
         </Route>
-
         <Route path="/mesa/login" element={<TableLogin onLogin={(t) => { setActiveTable(t); setIsWaitstaff(false); }} />} />
         <Route path="/garconete" element={<WaitressPanel orders={orders} onSelectTable={(t) => { setActiveTable(t); setIsWaitstaff(true); }} />} />
         <Route path="/cardapio" element={<DigitalMenu products={products} categories={categories} settings={settings} orders={orders} addOrder={addOrder} tableNumber={activeTable} onLogout={() => { setActiveTable(null); setIsWaitstaff(false); }} isWaitstaff={isWaitstaff} />} />
@@ -185,7 +165,6 @@ export default function App() {
 function AdminLayout({ settings }: { settings: StoreSettings }) {
   const location = useLocation();
   const handleSignOut = async () => { await supabase.auth.signOut(); };
-
   return (
     <div className="flex min-h-screen bg-gray-50">
       <aside className="w-64 bg-[#3d251e] text-white hidden md:flex flex-col border-r border-gray-800">
@@ -193,59 +172,18 @@ function AdminLayout({ settings }: { settings: StoreSettings }) {
           <img src={settings.logoUrl} alt="Logo" className="w-10 h-10 rounded-full object-cover border-2 border-orange-500" />
           <span className="font-brand text-lg font-bold">{settings.storeName}</span>
         </div>
-        <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
-          <Link to="/" className={`flex items-center gap-3 p-3 rounded-xl transition-all ${location.pathname === '/' ? 'bg-[#f68c3e]' : 'hover:bg-white/5'}`}>
-            <LayoutDashboard size={20} /> Dashboard
-          </Link>
-          <Link to="/pedidos" className={`flex items-center gap-3 p-3 rounded-xl transition-all ${location.pathname === '/pedidos' ? 'bg-[#f68c3e]' : 'hover:bg-white/5'}`}>
-            <ShoppingCart size={20} /> Pedidos
-          </Link>
-          <Link to="/cardapio-admin" className={`flex items-center gap-3 p-3 rounded-xl transition-all ${location.pathname === '/cardapio-admin' ? 'bg-[#f68c3e]' : 'hover:bg-white/5'}`}>
-            <PlusCircle size={20} /> Cardápio
-          </Link>
-          <Link to="/configuracoes" className={`flex items-center gap-3 p-3 rounded-xl transition-all ${location.pathname === '/configuracoes' ? 'bg-[#f68c3e]' : 'hover:bg-white/5'}`}>
-            <Settings size={20} /> Ajustes
-          </Link>
-
-          <div className="pt-6 pb-2 px-3">
-              <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Acesso Externo</p>
-          </div>
-          
-          <a href="#/cardapio" target="_blank" rel="noopener noreferrer" className="flex items-center justify-between p-3 rounded-xl hover:bg-white/5 text-gray-300 group">
-            <div className="flex items-center gap-3">
-              <Utensils size={20} /> <span>Cardápio Digital</span>
-            </div>
-            <ExternalLink size={14} className="opacity-0 group-hover:opacity-100 transition-opacity" />
-          </a>
-          
-          <a href="#/garconete" target="_blank" rel="noopener noreferrer" className="flex items-center justify-between p-3 rounded-xl hover:bg-white/5 text-gray-300 group">
-            <div className="flex items-center gap-3">
-              <UserRound size={20} /> <span>Painel Garçom</span>
-            </div>
-            <ExternalLink size={14} className="opacity-0 group-hover:opacity-100 transition-opacity" />
-          </a>
-
-          <a href="#/tv" target="_blank" rel="noopener noreferrer" className="flex items-center justify-between p-3 rounded-xl hover:bg-white/5 text-gray-300 group">
-            <div className="flex items-center gap-3">
-              <Tv size={20} /> <span>Painel TV</span>
-            </div>
-            <ExternalLink size={14} className="opacity-0 group-hover:opacity-100 transition-opacity" />
-          </a>
+        <nav className="flex-1 p-4 space-y-1">
+          <Link to="/" className={`flex items-center gap-3 p-3 rounded-xl ${location.pathname === '/' ? 'bg-[#f68c3e]' : 'hover:bg-white/5'}`}><LayoutDashboard size={20} /> Dashboard</Link>
+          <Link to="/pedidos" className={`flex items-center gap-3 p-3 rounded-xl ${location.pathname === '/pedidos' ? 'bg-[#f68c3e]' : 'hover:bg-white/5'}`}><ShoppingCart size={20} /> Pedidos</Link>
+          <Link to="/cardapio-admin" className={`flex items-center gap-3 p-3 rounded-xl ${location.pathname === '/cardapio-admin' ? 'bg-[#f68c3e]' : 'hover:bg-white/5'}`}><PlusCircle size={20} /> Cardápio</Link>
+          <Link to="/configuracoes" className={`flex items-center gap-3 p-3 rounded-xl ${location.pathname === '/configuracoes' ? 'bg-[#f68c3e]' : 'hover:bg-white/5'}`}><Settings size={20} /> Ajustes</Link>
+          <div className="pt-6 pb-2 px-3 text-[10px] text-gray-500 font-bold uppercase">Telas Externas</div>
+          <a href="#/cardapio" target="_blank" className="flex items-center justify-between p-3 rounded-xl hover:bg-white/5 text-gray-300 group"><div className="flex items-center gap-3"><Utensils size={20} /> Cardápio</div><ExternalLink size={14} className="opacity-0 group-hover:opacity-100" /></a>
+          <a href="#/tv" target="_blank" className="flex items-center justify-between p-3 rounded-xl hover:bg-white/5 text-gray-300 group"><div className="flex items-center gap-3"><Tv size={20} /> Painel TV</div><ExternalLink size={14} className="opacity-0 group-hover:opacity-100" /></a>
         </nav>
-        
-        <div className="p-4 border-t border-white/10 space-y-2">
-          <button onClick={handleSignOut} className="w-full flex items-center gap-3 p-3 rounded-xl text-red-400 hover:bg-red-500/10 text-sm font-bold"><LogOut size={18} /> Sair</button>
-        </div>
+        <div className="p-4 border-t border-white/10"><button onClick={handleSignOut} className="w-full flex items-center gap-3 p-3 rounded-xl text-red-400 hover:bg-red-500/10 text-sm font-bold"><LogOut size={18} /> Sair</button></div>
       </aside>
-      <main className="flex-1 overflow-auto">
-        <header className="bg-white h-16 border-b flex items-center justify-between px-8 sticky top-0 z-10">
-          <h1 className="text-xl font-bold text-gray-800">Vovó Guta Admin</h1>
-          <img src={settings.logoUrl} className="w-10 h-10 rounded-full border border-gray-100" />
-        </header>
-        <div className="p-8">
-          <Outlet />
-        </div>
-      </main>
+      <main className="flex-1 overflow-auto"><header className="bg-white h-16 border-b flex items-center justify-between px-8 sticky top-0 z-10"><h1 className="text-xl font-bold text-gray-800">Admin Panel</h1><img src={settings.logoUrl} className="w-10 h-10 rounded-full border" /></header><div className="p-8"><Outlet /></div></main>
     </div>
   );
 }
