@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { ShoppingCart, X, ChevronLeft, Trash2, Plus as PlusIcon, CheckCircle, Loader2, Search, Clock, Star, Weight, Ban } from 'lucide-react';
 import { Product, StoreSettings, Order, OrderItem, OrderType, PaymentMethod } from '../types';
@@ -38,6 +38,14 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [deliveryAddress, setDeliveryAddress] = useState('');
+
+  // Sincroniza o número da mesa se vier da URL ou do garçom
+  useEffect(() => {
+    if (effectiveTable) {
+      setManualTable(effectiveTable);
+      setOrderType('MESA');
+    }
+  }, [effectiveTable]);
 
   const isStoreOpen = useMemo(() => settings.isDeliveryActive || settings.isTableOrderActive || settings.isCounterPickupActive, [settings]);
 
@@ -117,7 +125,8 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
         setCart([]);
         setCheckoutStep('success');
     } catch (err: any) {
-        alert(`Erro: ${err.message}`);
+        console.error('Falha ao enviar pedido:', err);
+        alert(`Não foi possível enviar o pedido. Verifique sua conexão ou se os dados do cliente estão corretos.`);
     } finally {
         setIsSending(false);
     }
@@ -293,7 +302,7 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
                       <h2 className="text-2xl font-bold text-[#3d251e]">Pedido Enviado!</h2>
                       <p className="text-gray-500 max-w-xs mx-auto">Seu pedido já está em nossa cozinha. Acompanhe pelo painel da loja.</p>
                     </div>
-                    <button onClick={() => { setCart([]); setCheckoutStep('cart'); setIsCartOpen(false); onLogout(); }} className="w-full py-5 bg-[#3d251e] text-white rounded-3xl font-bold shadow-xl active:scale-95 transition-transform">Finalizar e Sair</button>
+                    <button onClick={() => { setCart([]); setCheckoutStep('cart'); setIsCartOpen(false); }} className="w-full py-5 bg-[#3d251e] text-white rounded-3xl font-bold shadow-xl active:scale-95 transition-transform">Finalizar</button>
                 </div>
               )}
             </div>

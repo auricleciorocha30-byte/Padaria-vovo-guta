@@ -30,7 +30,6 @@ import WaitressPanel from './pages/WaitressPanel.tsx';
 import WeeklyOffers from './pages/WeeklyOffers.tsx';
 import LoginPage from './pages/LoginPage.tsx';
 import WaitstaffManagement from './pages/WaitstaffManagement.tsx';
-import TableLogin from './pages/TableLogin.tsx';
 
 const SOUNDS = {
   NEW_ORDER: 'https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3',
@@ -114,21 +113,26 @@ export default function App() {
   }, []);
 
   const addOrder = async (order: Order) => {
-    // Garantindo que todos os campos existam para evitar erros de schema cache do Supabase
-    const { error } = await supabase.from('orders').insert([{
+    // Construção dinâmica do objeto para evitar erro se as colunas não existirem
+    const orderData: any = {
       id: order.id,
       type: order.type,
       items: order.items,
       status: order.status,
       total: order.total,
-      createdAt: order.createdAt,
-      paymentMethod: order.paymentMethod || 'PIX',
-      tableNumber: order.tableNumber || null,
-      notes: order.notes || null,
-      customerName: order.customerName || null,
-      customerPhone: order.customerPhone || null,
-      deliveryAddress: order.deliveryAddress || null
-    }]);
+      createdAt: order.createdAt
+    };
+
+    // Só envia os campos extras se eles tiverem valor, 
+    // mas se o banco não tiver as colunas, o Supabase retornará erro de qualquer forma.
+    if (order.paymentMethod) orderData.paymentMethod = order.paymentMethod;
+    if (order.tableNumber) orderData.tableNumber = order.tableNumber;
+    if (order.notes) orderData.notes = order.notes;
+    if (order.customerName) orderData.customerName = order.customerName;
+    if (order.customerPhone) orderData.customerPhone = order.customerPhone;
+    if (order.deliveryAddress) orderData.deliveryAddress = order.deliveryAddress;
+
+    const { error } = await supabase.from('orders').insert([orderData]);
     
     if (error) {
       console.error('Erro ao adicionar pedido:', error);
@@ -151,7 +155,7 @@ export default function App() {
     if (wasWaitstaff) {
         window.location.hash = '/garconete';
     } else {
-        window.location.hash = '/mesa/login';
+        window.location.hash = '/cardapio';
     }
   };
 
@@ -172,7 +176,7 @@ export default function App() {
         <Route path="/garconete" element={<WaitressPanel orders={orders} onSelectTable={(t) => { setActiveTable(t); setIsWaitstaff(true); }} />} />
         <Route path="/cardapio" element={<DigitalMenu products={products} categories={categories} settings={settings} orders={orders} addOrder={addOrder} tableNumber={activeTable} onLogout={handleLogout} isWaitstaff={isWaitstaff} />} />
         <Route path="/tv" element={<TVBoard orders={orders} settings={settings} products={products} />} />
-        <Route path="/mesa/login" element={<TableLogin onLogin={(t) => setActiveTable(t)} />} />
+        <Route path="*" element={<Navigate to="/cardapio" />} />
       </Routes>
     </HashRouter>
   );
