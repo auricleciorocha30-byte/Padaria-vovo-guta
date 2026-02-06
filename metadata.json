@@ -1,0 +1,7 @@
+{
+  "name": "Vovó Guta - Sistema de Gestão Gastronômica",
+  "description": "Sistema completo para padarias e confeitarias com cardápio digital, gestão de mesas, pedidos de balcão/entrega, painel TV e programa de fidelidade.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
