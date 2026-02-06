@@ -94,7 +94,7 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
   const handleCheckout = async () => {
     if (cart.length === 0) return;
     if (orderType === 'MESA' && !manualTable) { alert('Informe o número da mesa.'); return; }
-    if (orderType === 'ENTREGA' && (!customerName.trim() || !customerPhone.trim() || !deliveryAddress.trim())) { alert('Preencha todos os campos obrigatórios.'); return; }
+    if (orderType === 'ENTREGA' && (!customerName.trim() || !customerPhone.trim() || !deliveryAddress.trim())) { alert('Preencha os campos obrigatórios.'); return; }
     
     setIsSending(true);
     const finalOrder: Order = {
@@ -218,7 +218,7 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
                     </div>
                 </div>
                 <div className="pt-2">
-                    <p className="text-xs text-gray-400 mb-1 font-bold">VALOR DO PEDIDO</p>
+                    <p className="text-xs text-gray-400 mb-1 font-bold uppercase tracking-widest">Valor Aproximado</p>
                     <p className="text-4xl font-black text-orange-600">R$ {((weightProduct.price * currentWeightInput) / 1000).toFixed(2)}</p>
                 </div>
                 <div className="flex gap-3">
@@ -238,7 +238,7 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
                 <button onClick={() => setIsCartOpen(false)} className="p-2 text-gray-400"><X size={24} /></button>
               </div>
             )}
-            <div className="flex-1 overflow-auto p-8 space-y-6">
+            <div className="flex-1 overflow-auto p-8 space-y-6 custom-scrollbar">
               {checkoutStep === 'cart' && (
                 <div className="space-y-4">
                   {cart.length === 0 ? <div className="py-10 text-center text-gray-400 italic">Sua sacola está vazia...</div> : 
@@ -273,34 +273,39 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
                       {settings.isDeliveryActive && <button onClick={() => setOrderType('ENTREGA')} className={`p-4 rounded-2xl border-2 text-[10px] font-bold ${orderType === 'ENTREGA' ? 'border-[#f68c3e] bg-orange-50 text-[#f68c3e]' : 'border-gray-50 text-gray-400'}`}>ENTREGA</button>}
                   </div>
                   <div className="space-y-4">
-                    {orderType === 'MESA' && <input type="text" placeholder="Número da Mesa" value={manualTable} onChange={e => setManualTable(e.target.value)} className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl font-bold" />}
+                    {orderType === 'MESA' && <input type="text" placeholder="Número da Mesa" value={manualTable} onChange={e => setManualTable(e.target.value)} className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl font-bold outline-none" />}
                     {(orderType === 'ENTREGA' || orderType === 'BALCAO') && (
                       <div className="space-y-4">
-                        <input type="text" placeholder="Seu Nome *" value={customerName} onChange={e => setCustomerName(e.target.value)} className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl font-bold" />
-                        <input type="tel" placeholder="WhatsApp / Telefone *" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl font-bold" />
+                        <input type="text" placeholder="Seu Nome *" value={customerName} onChange={e => setCustomerName(e.target.value)} className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl font-bold outline-none" />
+                        <input type="tel" placeholder="WhatsApp / Telefone *" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl font-bold outline-none" />
                       </div>
                     )}
-                    {orderType === 'ENTREGA' && <textarea placeholder="Endereço Completo *" value={deliveryAddress} onChange={e => setDeliveryAddress(e.target.value)} className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl font-bold" />}
+                    {orderType === 'ENTREGA' && <textarea placeholder="Endereço Completo *" value={deliveryAddress} onChange={e => setDeliveryAddress(e.target.value)} className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl font-bold outline-none min-h-[100px]" />}
                   </div>
                 </div>
               )}
               {checkoutStep === 'success' && (
                 <div className="flex flex-col items-center justify-center py-10 text-center space-y-6">
-                    <div className="w-24 h-24 bg-green-100 text-green-600 rounded-full flex items-center justify-center animate-bounce shadow-inner"><CheckCircle size={56} /></div>
-                    <div><h2 className="text-2xl font-bold text-[#3d251e]">Pedido Enviado!</h2><p className="text-gray-500 max-w-xs mx-auto">Seu pedido já está em nossa cozinha.</p></div>
-                    <button onClick={() => { setCart([]); setCheckoutStep('cart'); setIsCartOpen(false); onLogout(); }} className="w-full py-5 bg-[#3d251e] text-white rounded-3xl font-bold shadow-xl">Finalizar e Sair</button>
+                    <div className="w-24 h-24 bg-green-100 text-green-600 rounded-full flex items-center justify-center animate-bounce shadow-inner">
+                      <CheckCircle size={56} />
+                    </div>
+                    <div>
+                      <h2 className="text-2xl font-bold text-[#3d251e]">Pedido Enviado!</h2>
+                      <p className="text-gray-500 max-w-xs mx-auto">Seu pedido já está em nossa cozinha. Acompanhe pelo painel da loja.</p>
+                    </div>
+                    <button onClick={() => { setCart([]); setCheckoutStep('cart'); setIsCartOpen(false); onLogout(); }} className="w-full py-5 bg-[#3d251e] text-white rounded-3xl font-bold shadow-xl active:scale-95 transition-transform">Finalizar e Sair</button>
                 </div>
               )}
             </div>
             {checkoutStep !== 'success' && (
               <div className="p-8 bg-gray-50 border-t">
                 <div className="flex justify-between items-center mb-6">
-                  <span className="text-gray-400 text-xs font-bold uppercase tracking-widest">Total</span>
+                  <span className="text-gray-400 text-xs font-bold uppercase tracking-widest">Total Geral</span>
                   <span className="text-4xl font-brand font-bold text-[#3d251e]">R$ {cartTotal.toFixed(2)}</span>
                 </div>
                 <div className="flex gap-3">
-                    {checkoutStep === 'details' && <button onClick={() => setCheckoutStep('cart')} className="px-6 py-4 bg-white border border-gray-200 text-gray-400 rounded-2xl"><ChevronLeft/></button>}
-                    <button disabled={cart.length === 0 || isSending} onClick={() => checkoutStep === 'cart' ? (isWaitstaff ? handleCheckout() : setCheckoutStep('details')) : handleCheckout()} className={`flex-1 py-5 rounded-3xl font-bold text-white shadow-xl ${isWaitstaff ? 'bg-[#f68c3e]' : 'bg-[#3d251e]'} disabled:opacity-30`}>
+                    {checkoutStep === 'details' && <button onClick={() => setCheckoutStep('cart')} className="px-6 py-4 bg-white border border-gray-200 text-gray-400 rounded-2xl hover:text-black"><ChevronLeft/></button>}
+                    <button disabled={cart.length === 0 || isSending} onClick={() => checkoutStep === 'cart' ? (isWaitstaff ? handleCheckout() : setCheckoutStep('details')) : handleCheckout()} className={`flex-1 py-5 rounded-3xl font-bold text-white shadow-xl active:scale-95 transition-transform ${isWaitstaff ? 'bg-[#f68c3e]' : 'bg-[#3d251e]'} disabled:opacity-30`}>
                       {isSending ? <Loader2 className="animate-spin"/> : checkoutStep === 'cart' ? 'Continuar' : 'Enviar Pedido'}
                     </button>
                 </div>

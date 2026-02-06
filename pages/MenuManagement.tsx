@@ -33,9 +33,9 @@ const MenuManagement: React.FC<Props> = ({ products, saveProduct, deleteProduct,
             price: editingProduct.price || 0,
             category: editingProduct.category || categories[0] || 'Geral',
             imageUrl: editingProduct.imageUrl || 'https://picsum.photos/400/300',
-            isActive: editingProduct.isActive !== false, // Default true
+            isActive: editingProduct.isActive !== false,
             featuredDay: editingProduct.featuredDay === -1 ? undefined : editingProduct.featuredDay,
-            isByWeight: !!editingProduct.isByWeight // Garante que seja booleano
+            isByWeight: !!editingProduct.isByWeight
         };
 
         await saveProduct(productData as Product);
@@ -77,7 +77,7 @@ const MenuManagement: React.FC<Props> = ({ products, saveProduct, deleteProduct,
           />
         </div>
         <button 
-            onClick={() => { setEditingProduct({ category: categories[0] || '', featuredDay: -1, isActive: true, isByWeight: false }); setShowProductModal(true); }}
+            onClick={() => { setEditingProduct({ category: categories[0] || '', description: '', featuredDay: -1, isActive: true, isByWeight: false }); setShowProductModal(true); }}
             className="px-6 py-3 bg-[#f68c3e] text-white font-bold rounded-xl flex items-center justify-center gap-2 hover:bg-orange-600 transition-colors shadow-md w-full md:w-auto"
         >
             <Plus size={20} /> Novo Produto
@@ -127,7 +127,7 @@ const MenuManagement: React.FC<Props> = ({ products, saveProduct, deleteProduct,
               <h2 className="text-xl font-bold">{editingProduct?.id ? 'Editar Produto' : 'Cadastrar Produto'}</h2>
               <button onClick={() => setShowProductModal(false)} className="text-gray-400"><X /></button>
             </div>
-            <form onSubmit={handleSaveProduct} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
+            <form onSubmit={handleSaveProduct} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto custom-scrollbar">
               <div className="grid grid-cols-2 gap-4">
                   <div className="bg-orange-50 p-4 rounded-2xl flex items-center justify-between border border-orange-100">
                       <div className="flex items-center gap-2">
@@ -161,6 +161,18 @@ const MenuManagement: React.FC<Props> = ({ products, saveProduct, deleteProduct,
                   <input required type="text" value={editingProduct?.name || ''} onChange={(e) => setEditingProduct({...editingProduct, name: e.target.value})} className="w-full p-2 border border-gray-200 rounded-lg outline-none" />
                 </div>
               </div>
+              
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Descrição</label>
+                <textarea 
+                  rows={2} 
+                  value={editingProduct?.description || ''} 
+                  onChange={(e) => setEditingProduct({...editingProduct, description: e.target.value})} 
+                  className="w-full p-3 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-orange-500 resize-none text-sm" 
+                  placeholder="Descreva o produto ou ingredientes..."
+                />
+              </div>
+
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-gray-500 uppercase mb-1">{editingProduct?.isByWeight ? 'Preço/KG' : 'Preço/UN'}</label>
@@ -175,7 +187,9 @@ const MenuManagement: React.FC<Props> = ({ products, saveProduct, deleteProduct,
               </div>
               <div className="pt-4 flex gap-3">
                 <button type="button" onClick={() => setShowProductModal(false)} className="flex-1 py-3 text-gray-500 font-bold">Cancelar</button>
-                <button type="submit" disabled={isSaving} className="flex-1 py-3 bg-[#3d251e] text-white font-bold rounded-xl shadow-lg"> {isSaving ? 'Salvando...' : 'Salvar'} </button>
+                <button type="submit" disabled={isSaving} className="flex-1 py-3 bg-[#3d251e] text-white font-bold rounded-xl shadow-lg flex items-center justify-center gap-2"> 
+                    {isSaving ? <Loader2 className="animate-spin" size={20} /> : 'Salvar'} 
+                </button>
               </div>
             </form>
           </div>
