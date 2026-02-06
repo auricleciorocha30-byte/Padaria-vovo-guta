@@ -26,7 +26,7 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
   const [searchTerm, setSearchTerm] = useState('');
   
   const [weightProduct, setWeightProduct] = useState<Product | null>(null);
-  const [selectedWeight, setSelectedWeight] = useState<number>(100);
+  const [selectedWeight, setSelectedWeight] = useState<string>("100"); // Armazenado como string para o input
 
   const effectiveTable = initialTable || urlTable || null;
   const [orderType, setOrderType] = useState<OrderType>(effectiveTable ? 'MESA' : 'BALCAO');
@@ -41,7 +41,6 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
 
   const isStoreOpen = useMemo(() => settings.isDeliveryActive || settings.isTableOrderActive || settings.isCounterPickupActive, [settings]);
 
-  // OFERTA DO DIA: Só exibe se o produto estiver ATIVO no estoque
   const todayOffer = useMemo(() => {
     const today = new Date().getDay();
     return products.find(p => p.featuredDay === today && p.isActive);
@@ -58,28 +57,32 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
     });
   }, [products, activeCategory, searchTerm]);
   
-  const handleAddToCart = (product: Product, quantity: number = 1) => {
+  const handleAddToCart = (product: Product, quantityOverride?: number) => {
     if (!product.isActive || !isStoreOpen) return;
 
-    if (product.isByWeight && !weightProduct) {
+    // Se o produto é por KG e ainda não abrimos o modal, abre ele.
+    if (product.isByWeight && quantityOverride === undefined) {
         setWeightProduct(product);
-        setSelectedWeight(100);
+        setSelectedWeight("100");
         return;
     }
+
+    const finalQuantity = quantityOverride !== undefined ? quantityOverride : 1;
 
     setCart(prev => {
       const existing = prev.find(item => item.productId === product.id);
       if (existing) {
-        return prev.map(item => item.productId === product.id ? { ...item, quantity: item.quantity + quantity } : item);
+        return prev.map(item => item.productId === product.id ? { ...item, quantity: item.quantity + finalQuantity } : item);
       }
       return [...prev, { 
           productId: product.id, 
           name: product.name, 
           price: product.price, 
-          quantity: quantity,
+          quantity: finalQuantity,
           isByWeight: product.isByWeight 
       }];
     });
+
     setWeightProduct(null);
   };
 
@@ -133,17 +136,7 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
     onLogout(); 
   };
 
-  if (!isStoreOpen && !isWaitstaff) {
-    return (
-      <div className="min-h-screen bg-[#fff5e1] flex flex-col items-center justify-center p-8 text-center">
-        <div className="bg-white p-10 rounded-[3rem] shadow-xl max-w-md border border-orange-100">
-            <Clock size={64} className="text-orange-500 mx-auto mb-6" />
-            <h1 className="text-3xl font-brand font-bold text-[#3d251e] mb-4">Loja Fechada</h1>
-            <button onClick={onLogout} className="w-full py-4 bg-[#3d251e] text-white rounded-2xl font-bold">Voltar ao Início</button>
-        </div>
-      </div>
-    );
-  }
+  const currentWeightGrams = parseInt(selectedWeight) || 0;
 
   return (
     <div className="min-h-screen bg-[#fff5e1] text-[#3d251e]">
@@ -221,7 +214,7 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
         </div>
       </main>
 
-      {/* Modal de Peso (KG) */}
+      {/* Modal de Peso (KG) - ATUALIZADO COM INPUT DE GRAMAS */}
       {weightProduct && (
         <div className="fixed inset-0 z-[60] bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
             <div className="bg-white w-full max-w-sm rounded-[3rem] p-8 space-y-6 text-center shadow-2xl animate-scale-up">
@@ -230,34 +223,54 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
                 </div>
                 <div>
                     <h2 className="text-xl font-bold">{weightProduct.name}</h2>
-                    <p className="text-xs text-gray-400">Qual a quantidade desejada?</p>
+                    <p className="text-xs text-gray-400">Quanto você deseja? (em gramas)</p>
                 </div>
                 
                 <div className="bg-gray-50 p-6 rounded-[2rem] border border-gray-100">
-                    <div className="flex items-center justify-between mb-2">
-                        <button onClick={() => setSelectedWeight(Math.max(50, selectedWeight - 50))} className="w-12 h-12 bg-white rounded-xl shadow-sm font-bold">-</button>
-                        <div className="text-center">
-                            <p className="text-3xl font-black text-[#3d251e]">{selectedWeight}g</p>
-                            <p className="text-[10px] text-gray-400 font-bold">{(selectedWeight / 1000).toFixed(3)} KG</p>
+                    <div className="flex flex-col items-center gap-4">
+                        <input 
+                            type="number" 
+                            autoFocus
+                            value={selectedWeight}
+                            onChange={(e) => setSelectedWeight(e.target.value)}
+                            className="w-full bg-white text-center text-4xl font-black text-[#3d251e] p-4 rounded-2xl border-2 border-transparent focus:border-blue-500 outline-none"
+                            placeholder="0"
+                        />
+                        <div className="flex gap-2">
+                             {[50, 100, 250, 500].map(val => (
+                                 <button 
+                                    key={val}
+                                    onClick={() => setSelectedWeight(val.toString())}
+                                    className="px-3 py-2 bg-white rounded-xl text-[10px] font-bold shadow-sm border border-gray-100 hover:bg-gray-50"
+                                 >
+                                    +{val}g
+                                 </button>
+                             ))}
                         </div>
-                        <button onClick={() => setSelectedWeight(selectedWeight + 50)} className="w-12 h-12 bg-white rounded-xl shadow-sm font-bold">+</button>
                     </div>
                 </div>
 
                 <div className="pt-2">
-                    <p className="text-xs text-gray-400 mb-1">Valor proporcional</p>
-                    <p className="text-3xl font-bold text-orange-600">R$ {((weightProduct.price * selectedWeight) / 1000).toFixed(2)}</p>
+                    <p className="text-xs text-gray-400 mb-1">Preço proporcional</p>
+                    <p className="text-3xl font-bold text-orange-600">
+                        R$ {((weightProduct.price * currentWeightGrams) / 1000).toFixed(2)}
+                    </p>
                 </div>
 
                 <div className="flex gap-3">
                     <button onClick={() => setWeightProduct(null)} className="flex-1 py-4 text-gray-500 font-bold">Cancelar</button>
-                    <button onClick={() => handleAddToCart(weightProduct, selectedWeight / 1000)} className="flex-1 py-4 bg-[#3d251e] text-white rounded-2xl font-bold shadow-xl">Confirmar</button>
+                    <button 
+                        disabled={currentWeightGrams <= 0}
+                        onClick={() => handleAddToCart(weightProduct, currentWeightGrams / 1000)} 
+                        className="flex-1 py-4 bg-[#3d251e] text-white rounded-2xl font-bold shadow-xl disabled:opacity-50"
+                    >
+                        Confirmar
+                    </button>
                 </div>
             </div>
         </div>
       )}
 
-      {/* Cart e Checkout (omitidos para brevidade, sem alteração lógica aqui) */}
       {isCartOpen && (
         <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-end sm:items-center justify-center p-4">
           <div className="bg-white w-full max-w-lg rounded-t-[3rem] sm:rounded-[3rem] overflow-hidden flex flex-col max-h-[90vh] shadow-2xl">
@@ -277,7 +290,7 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
                         <div>
                             <p className="font-bold text-sm">{item.name}</p>
                             <p className="text-[10px] text-gray-400 font-bold uppercase tracking-tight">
-                                {item.isByWeight ? `${item.quantity.toFixed(3).replace('.',',')} KG` : `${item.quantity}x`} • R$ {(item.price * item.quantity).toFixed(2)}
+                                {item.isByWeight ? `${(item.quantity * 1000).toFixed(0)}g` : `${item.quantity}x`} • R$ {(item.price * item.quantity).toFixed(2)}
                             </p>
                         </div>
                         <button onClick={() => removeFromCart(item.productId)} className="text-red-300"><Trash2 size={18} /></button>

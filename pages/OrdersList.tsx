@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { Order, OrderStatus, Product, OrderType, OrderItem, StoreSettings } from '../types';
-import { Clock, CheckCircle, XCircle, ShoppingBag, MapPin, Printer, CreditCard, Banknote, MessageSquare, Hash, Truck, Utensils, User, Phone, ExternalLink } from 'lucide-react';
+import { Clock, CheckCircle, XCircle, ShoppingBag, MapPin, Printer, CreditCard, Banknote, MessageSquare, Hash, Truck, Utensils, User, Phone, ExternalLink, Weight } from 'lucide-react';
 
 interface Props {
   orders: Order[];
@@ -158,9 +158,13 @@ const OrdersList: React.FC<Props> = ({ orders, updateStatus, products, addOrder,
             <div className="flex-1 space-y-2 mb-6 max-h-48 overflow-y-auto px-1 custom-scrollbar">
               {group.items.map((item, idx) => (
                 <div key={idx} className="flex justify-between items-center text-sm border-b border-gray-50 pb-1">
-                  <span className="text-gray-700">
-                    <strong className="text-orange-500 mr-1">
-                        {item.isByWeight ? `${item.quantity.toFixed(3).replace('.',',')} KG` : `${item.quantity}x`}
+                  <span className="text-gray-700 flex items-center gap-1">
+                    <strong className="text-orange-500 mr-1 flex items-center gap-1">
+                        {item.isByWeight ? (
+                             <><Weight size={12}/> {(item.quantity * 1000).toFixed(0)}g</>
+                        ) : (
+                             <>{item.quantity}x</>
+                        )}
                     </strong> 
                     {item.name}
                   </span>
@@ -169,7 +173,6 @@ const OrdersList: React.FC<Props> = ({ orders, updateStatus, products, addOrder,
               ))}
             </div>
 
-            {/* BLOCO DE OBSERVAÇÕES - CORRIGIDO E DESTACADO */}
             {group.notes.length > 0 && (
               <div className="mb-4 space-y-2">
                   {group.notes.map((note, nIdx) => (
@@ -219,7 +222,7 @@ const OrdersList: React.FC<Props> = ({ orders, updateStatus, products, addOrder,
               <div style={{ borderTop: '1px dashed #000', padding: '2mm 0' }}>
                   {printOrder.items.map((it, i) => (
                       <div key={i} style={{ display: 'flex', justifyContent: 'space-between' }}>
-                          <span>{it.isByWeight ? `${it.quantity.toFixed(3)} KG` : `${it.quantity}x`} {it.name.slice(0, 15)}</span>
+                          <span>{it.isByWeight ? `${(it.quantity * 1000).toFixed(0)}g` : `${it.quantity}x`} {it.name.slice(0, 15)}</span>
                           <span>R$ {(it.price * it.quantity).toFixed(2)}</span>
                       </div>
                   ))}
