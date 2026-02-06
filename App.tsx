@@ -63,12 +63,14 @@ export default function App() {
 
     fetchInitialData();
 
-    // REALTIME SUBSCRIPTIONS
-    const ordersSubscription = supabase
-      .channel('public:orders')
+    // REALTIME SUBSCRIPTIONS - REFINED FOR INSTANT SYNC
+    const ordersChannel = supabase
+      .channel('orders-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, (payload) => {
         if (payload.eventType === 'INSERT') {
           setOrders(prev => [payload.new as Order, ...prev]);
+          // Opcional: Tocar som de novo pedido
+          try { new Audio('https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3').play(); } catch(e) {}
         } else if (payload.eventType === 'UPDATE') {
           setOrders(prev => prev.map(o => o.id === payload.new.id ? (payload.new as Order) : o));
         } else if (payload.eventType === 'DELETE') {
@@ -78,7 +80,7 @@ export default function App() {
       .subscribe();
 
     const productsSubscription = supabase
-      .channel('public:products')
+      .channel('products-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, (payload) => {
         if (payload.eventType === 'INSERT') {
           setProducts(prev => [...prev, payload.new as Product]);
@@ -87,22 +89,6 @@ export default function App() {
         } else if (payload.eventType === 'DELETE') {
           setProducts(prev => prev.filter(p => p.id !== payload.old.id));
         }
-      })
-      .subscribe();
-
-    const categoriesSubscription = supabase
-      .channel('public:categories')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'categories' }, () => {
-        supabase.from('categories').select('name').then(res => {
-          if (res.data) setCategories(res.data.map(c => c.name));
-        });
-      })
-      .subscribe();
-
-    const settingsSubscription = supabase
-      .channel('public:settings')
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'settings', filter: 'id=eq.store' }, (payload) => {
-        setSettings(payload.new.data);
       })
       .subscribe();
 
@@ -118,21 +104,25 @@ export default function App() {
 
     return () => {
       subscription.unsubscribe();
-      supabase.removeChannel(ordersSubscription);
+      supabase.removeChannel(ordersChannel);
       supabase.removeChannel(productsSubscription);
-      supabase.removeChannel(categoriesSubscription);
-      supabase.removeChannel(settingsSubscription);
     };
   }, []);
 
   const addOrder = async (order: Order) => {
     const { error } = await supabase.from('orders').insert(order);
-    if (error) console.error('Error adding order:', error);
+    if (error) {
+      console.error('Error adding order:', error);
+      throw error;
+    }
   };
 
   const updateOrderStatus = async (id: string, status: OrderStatus) => {
     const { error } = await supabase.from('orders').update({ status }).eq('id', id);
-    if (error) console.error('Error updating order status:', error);
+    if (error) {
+      console.error('Error updating order status:', error);
+      throw error;
+    }
   };
 
   const handleUpdateSettings = async (newSettings: StoreSettings) => {
@@ -141,18 +131,12 @@ export default function App() {
 
   const saveProduct = async (product: Product) => {
     const { error } = await supabase.from('products').upsert(product);
-    if (error) {
-      console.error('Error saving product:', error);
-      throw error;
-    }
+    if (error) throw error;
   };
 
   const deleteProduct = async (id: string) => {
     const { error } = await supabase.from('products').delete().eq('id', id);
-    if (error) {
-      console.error('Error deleting product:', error);
-      throw error;
-    }
+    if (error) throw error;
   };
 
   if (authLoading) {
@@ -188,15 +172,12 @@ export default function App() {
 
 function AdminLayout({ settings }: { settings: StoreSettings }) {
   const location = useLocation();
-
-  const handleSignOut = async () => {
-    await supabase.auth.signOut();
-  };
+  const handleSignOut = async () => { await supabase.auth.signOut(); };
 
   const navItems = [
     { path: '/', icon: <LayoutDashboard size={20} />, label: 'Dashboard' },
     { path: '/pedidos', icon: <ShoppingCart size={20} />, label: 'Pedidos' },
-    { path: '/cardapio-admin', icon: <PlusCircle size={20} />, label: 'Gerenciar Cardápio' },
+    { path: '/cardapio-admin', icon: <PlusCircle size={20} />, label: 'Cardápio' },
     { path: '/configuracoes', icon: <Settings size={20} />, label: 'Configurações' },
   ];
 
@@ -204,81 +185,35 @@ function AdminLayout({ settings }: { settings: StoreSettings }) {
     <div className="flex min-h-screen bg-gray-50">
       <aside className="w-64 bg-[#3d251e] text-white hidden md:flex flex-col border-r border-gray-800">
         <div className="p-6 flex items-center gap-3 border-b border-white/10">
-          <div className="w-10 h-10 rounded-full bg-[#f68c3e] flex items-center justify-center overflow-hidden">
-             <img src={settings.logoUrl} alt="Logo" className="w-full h-full object-cover" />
-          </div>
+          <img src={settings.logoUrl} alt="Logo" className="w-10 h-10 rounded-full object-cover border-2 border-orange-500" />
           <span className="font-brand text-lg font-bold">{settings.storeName}</span>
         </div>
-        
-        <nav className="flex-1 p-4 space-y-2">
+        <nav className="flex-1 p-4 space-y-1">
           {navItems.map(item => (
-            <Link 
-              key={item.path}
-              to={item.path}
-              className={`flex items-center gap-3 p-3 rounded-lg transition-colors ${
-                location.pathname === item.path ? 'bg-[#f68c3e] text-white shadow-md' : 'hover:bg-white/5'
-              }`}
-            >
-              {item.icon}
-              <span className="font-medium">{item.label}</span>
+            <Link key={item.path} to={item.path} className={`flex items-center gap-3 p-3 rounded-xl transition-all ${location.pathname === item.path ? 'bg-[#f68c3e] text-white shadow-lg' : 'hover:bg-white/5 text-gray-400 hover:text-white'}`}>
+              {item.icon} <span className="font-medium">{item.label}</span>
             </Link>
           ))}
         </nav>
-
-        <div className="p-4 border-t border-white/10 space-y-4">
-          <Link to="/garcom" className={`flex items-center gap-3 p-3 rounded-lg transition-colors ${location.pathname === '/garcom' ? 'bg-orange-500 text-white' : 'bg-white/5 hover:bg-white/10'}`}>
-            <ShieldCheck size={20} />
-            <span className="font-bold">Gerenc. Garçom</span>
-          </Link>
-          <Link to="/ofertas" className={`flex items-center gap-3 p-3 rounded-lg transition-colors ${location.pathname === '/ofertas' ? 'bg-orange-500 text-white' : 'bg-white/5 hover:bg-white/10'}`}>
-            <CalendarDays size={20} />
-            <span className="font-bold">Ofertas da Semana</span>
-          </Link>
-          <div className="h-4"></div>
-          <Link to="/garconete" target="_blank" className="flex items-center gap-3 p-3 rounded-lg bg-orange-600/20 text-orange-400 hover:bg-orange-600/30 transition-colors border border-orange-600/30">
-            <UserRound size={20} />
-            <span className="font-bold">Painel Garçonete</span>
-          </Link>
-          <Link to="/cardapio" target="_blank" className="flex items-center gap-3 p-3 rounded-lg bg-white/5 hover:bg-white/10 transition-colors">
-            <Utensils size={20} />
-            <span>Cardápio Digital</span>
-          </Link>
-          <Link to="/tv" target="_blank" className="flex items-center gap-3 p-3 rounded-lg bg-white/5 hover:bg-white/10 transition-colors text-orange-400">
-            <Tv size={20} />
-            <span>Painel TV</span>
-          </Link>
-          
-          <button 
-            onClick={handleSignOut}
-            className="w-full flex items-center gap-3 p-3 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors text-sm font-bold mt-4"
-          >
-            <LogOut size={18} />
-            Sair do Admin
-          </button>
+        <div className="p-4 border-t border-white/10 space-y-2">
+          <Link to="/garcom" className="flex items-center gap-3 p-3 rounded-xl hover:bg-white/5 text-gray-400 text-sm"><ShieldCheck size={18} /> Permissões</Link>
+          <Link to="/ofertas" className="flex items-center gap-3 p-3 rounded-xl hover:bg-white/5 text-gray-400 text-sm"><CalendarDays size={18} /> Ofertas</Link>
+          <button onClick={handleSignOut} className="w-full flex items-center gap-3 p-3 rounded-xl text-red-400 hover:bg-red-500/10 text-sm font-bold mt-4"><LogOut size={18} /> Sair</button>
         </div>
       </aside>
-
-      <main className="flex-1 overflow-auto">
-        <header className="bg-white h-16 border-b flex items-center justify-between px-8 sticky top-0 z-10">
-          <h1 className="text-xl font-bold text-gray-800 uppercase tracking-tight">
-            {location.pathname === '/garcom' ? 'Gerenciamento de Equipe' : 
-             navItems.find(i => i.path === location.pathname)?.label || 'Vovó Guta Admin'}
-          </h1>
-          <div className="flex items-center gap-4">
-            <div className="text-right">
-              <p className="text-sm font-semibold text-gray-900">Gerente</p>
-              <p className="text-xs text-gray-500">Unidade Matriz</p>
-            </div>
-            <div className="w-10 h-10 rounded-full bg-gray-200 overflow-hidden shadow-inner">
-                <img src={settings.logoUrl} className="w-full h-full object-cover" />
-            </div>
+      <main className="flex-1 overflow-auto bg-gray-50">
+        <header className="bg-white h-16 border-b flex items-center justify-between px-8 sticky top-0 z-10 shadow-sm">
+          <h1 className="text-xl font-bold text-gray-800">{navItems.find(i => i.path === location.pathname)?.label || 'Vovó Guta'}</h1>
+          <div className="flex items-center gap-3">
+             <div className="text-right">
+                <p className="text-sm font-bold">Admin</p>
+                <p className="text-[10px] text-gray-400 uppercase">Unidade Matriz</p>
+             </div>
+             <img src={settings.logoUrl} className="w-10 h-10 rounded-full border border-gray-100" />
           </div>
         </header>
-
         <div className="p-8">
-          <React.Suspense fallback={<div>Carregando componentes...</div>}>
-            <Outlet />
-          </React.Suspense>
+          <Outlet />
         </div>
       </main>
     </div>
