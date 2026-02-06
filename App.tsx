@@ -93,7 +93,6 @@ export default function App() {
     const categoriesSubscription = supabase
       .channel('public:categories')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'categories' }, () => {
-        // Simpler to refetch categories to maintain order
         supabase.from('categories').select('name').then(res => {
           if (res.data) setCategories(res.data.map(c => c.name));
         });
@@ -127,7 +126,6 @@ export default function App() {
   }, []);
 
   const addOrder = async (order: Order) => {
-    // We only need to push to DB, Realtime listener will update local state
     const { error } = await supabase.from('orders').insert(order);
     if (error) console.error('Error adding order:', error);
   };
@@ -138,14 +136,23 @@ export default function App() {
   };
 
   const handleUpdateSettings = async (newSettings: StoreSettings) => {
-    // Realtime will update local state for all users
     await supabase.from('settings').upsert({ id: 'store', data: newSettings });
   };
 
-  const updateProductList = async (newList: Product[]) => {
-    // This is handled by each individual product's Realtime sync, 
-    // but we can update state locally for immediate feedback in Admin
-    setProducts(newList);
+  const saveProduct = async (product: Product) => {
+    const { error } = await supabase.from('products').upsert(product);
+    if (error) {
+      console.error('Error saving product:', error);
+      throw error;
+    }
+  };
+
+  const deleteProduct = async (id: string) => {
+    const { error } = await supabase.from('products').delete().eq('id', id);
+    if (error) {
+      console.error('Error deleting product:', error);
+      throw error;
+    }
   };
 
   if (authLoading) {
@@ -163,10 +170,10 @@ export default function App() {
 
         <Route path="/" element={session ? <AdminLayout settings={settings} /> : <Navigate to="/login" />}>
           <Route index element={<AdminDashboard orders={orders} products={products} />} />
-          <Route path="cardapio-admin" element={<MenuManagement products={products} setProducts={updateProductList} categories={categories} setCategories={setCategories} />} />
+          <Route path="cardapio-admin" element={<MenuManagement products={products} saveProduct={saveProduct} deleteProduct={deleteProduct} categories={categories} setCategories={setCategories} />} />
           <Route path="pedidos" element={<OrdersList orders={orders} updateStatus={updateOrderStatus} products={products} addOrder={addOrder} settings={settings} />} />
           <Route path="garcom" element={<WaitstaffManagement settings={settings} onUpdateSettings={handleUpdateSettings} />} />
-          <Route path="ofertas" element={<WeeklyOffers products={products} setProducts={updateProductList} />} />
+          <Route path="ofertas" element={<WeeklyOffers products={products} saveProduct={saveProduct} />} />
           <Route path="configuracoes" element={<StoreSettingsPage settings={settings} setSettings={handleUpdateSettings} />} />
         </Route>
 

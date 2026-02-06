@@ -5,10 +5,10 @@ import { CalendarDays, Star, Plus, X, CheckCircle2 } from 'lucide-react';
 
 interface Props {
   products: Product[];
-  setProducts: (p: Product[]) => void;
+  saveProduct: (p: Product) => Promise<void>;
 }
 
-const WeeklyOffers: React.FC<Props> = ({ products, setProducts }) => {
+const WeeklyOffers: React.FC<Props> = ({ products, saveProduct }) => {
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
 
   const days = [
@@ -25,30 +25,28 @@ const WeeklyOffers: React.FC<Props> = ({ products, setProducts }) => {
     return products.find(p => p.featuredDay === dayId);
   };
 
-  const handleSetOffer = (productId: string | null, dayId: number) => {
-    const updatedProducts = products.map(p => {
-      // Remove any existing featuredDay for this day
-      if (p.featuredDay === dayId) {
-        return { ...p, featuredDay: undefined };
-      }
-      // Set the new featuredDay for the selected product
-      if (p.id === productId) {
-        return { ...p, featuredDay: dayId };
-      }
-      return p;
-    });
-    setProducts(updatedProducts);
+  const handleSetOffer = async (productId: string, dayId: number) => {
+    // 1. Remove existing offer for this day if any
+    const existing = getProductForDay(dayId);
+    if (existing) {
+        await saveProduct({ ...existing, featuredDay: undefined });
+    }
+
+    // 2. Set new offer
+    const product = products.find(p => p.id === productId);
+    if (product) {
+        // Also remove this product from any OTHER day it might be assigned to
+        await saveProduct({ ...product, featuredDay: dayId });
+    }
+    
     setSelectedDay(null);
   };
 
-  const removeOffer = (dayId: number) => {
-    const updatedProducts = products.map(p => {
-      if (p.featuredDay === dayId) {
-        return { ...p, featuredDay: undefined };
-      }
-      return p;
-    });
-    setProducts(updatedProducts);
+  const removeOffer = async (dayId: number) => {
+    const product = getProductForDay(dayId);
+    if (product) {
+        await saveProduct({ ...product, featuredDay: undefined });
+    }
   };
 
   return (
@@ -112,7 +110,6 @@ const WeeklyOffers: React.FC<Props> = ({ products, setProducts }) => {
         })}
       </div>
 
-      {/* Product Selection Modal */}
       {selectedDay !== null && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white w-full max-w-2xl rounded-[3rem] overflow-hidden shadow-2xl flex flex-col max-h-[80vh]">
@@ -130,7 +127,7 @@ const WeeklyOffers: React.FC<Props> = ({ products, setProducts }) => {
               {products.filter(p => p.isActive).map(p => (
                 <button
                   key={p.id}
-                  onClick={() => handleSetOffer(p.id, selectedDay)}
+                  onClick={() => handleSetOffer(p.id, selectedDay!)}
                   className="p-4 border border-gray-100 rounded-3xl flex items-center gap-4 hover:border-orange-500 hover:bg-orange-50 transition-all text-left group"
                 >
                   <img src={p.imageUrl} className="w-16 h-16 rounded-2xl object-cover shadow-sm" alt={p.name} />

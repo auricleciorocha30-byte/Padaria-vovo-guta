@@ -1,58 +1,66 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import { Product } from '../types';
-import { Plus, Search, Filter, Edit2, Trash2, Camera, Star, CheckCircle, XCircle, Tag, X, CalendarDays, AlignLeft } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, Camera, Star, CheckCircle, XCircle, Tag, X, AlignLeft, Loader2 } from 'lucide-react';
 import { Switch } from '../components/Switch';
 
 interface Props {
   products: Product[];
-  setProducts: (p: Product[]) => void;
+  saveProduct: (p: Product) => Promise<void>;
+  deleteProduct: (id: string) => Promise<void>;
   categories: string[];
   setCategories: (c: string[]) => void;
 }
 
-const MenuManagement: React.FC<Props> = ({ products, setProducts, categories, setCategories }) => {
+const MenuManagement: React.FC<Props> = ({ products, saveProduct, deleteProduct, categories, setCategories }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showProductModal, setShowProductModal] = useState(false);
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Partial<Product> | null>(null);
   const [newCategoryName, setNewCategoryName] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
 
   const filtered = products.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()));
 
-  const handleSaveProduct = (e: React.FormEvent) => {
+  const handleSaveProduct = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingProduct) return;
+    setIsSaving(true);
 
-    // If setting a featuredDay, ensure no other product has it for the same day
-    let updatedProducts = [...products];
-    if (editingProduct.featuredDay !== undefined && editingProduct.featuredDay !== -1) {
-        updatedProducts = updatedProducts.map(p => {
-            if (p.featuredDay === editingProduct.featuredDay && p.id !== editingProduct.id) {
-                return { ...p, featuredDay: undefined };
-            }
-            return p;
-        });
+    try {
+        const productData = {
+            id: editingProduct.id || Math.random().toString(36).substr(2, 9),
+            name: editingProduct.name || '',
+            description: editingProduct.description || '',
+            price: editingProduct.price || 0,
+            category: editingProduct.category || categories[0] || 'Geral',
+            imageUrl: editingProduct.imageUrl || 'https://picsum.photos/400/300',
+            isActive: editingProduct.isActive ?? true,
+            featuredDay: editingProduct.featuredDay === -1 ? undefined : editingProduct.featuredDay
+        };
+
+        // If setting a featuredDay, we should ideally handle the "only one per day" logic
+        // But the Supabase Realtime will sync other products if we changed them.
+        // For simplicity and to avoid race conditions, we save the current one.
+        await saveProduct(productData as Product);
+        
+        setShowProductModal(false);
+        setEditingProduct(null);
+    } catch (err) {
+        alert("Erro ao salvar produto. Tente novamente.");
+    } finally {
+        setIsSaving(false);
     }
+  };
 
-    const productData = {
-        ...editingProduct,
-        description: editingProduct.description || '',
-        isActive: editingProduct.isActive ?? true,
-        featuredDay: editingProduct.featuredDay === -1 ? undefined : editingProduct.featuredDay
-    };
-
-    if (editingProduct.id) {
-      setProducts(updatedProducts.map(p => p.id === editingProduct.id ? (productData as Product) : p));
-    } else {
-      const newProduct: Product = {
-        ...(productData as Omit<Product, 'id'>),
-        id: Math.random().toString(36).substr(2, 9),
-      };
-      setProducts([...updatedProducts, newProduct]);
+  const handleDelete = async (id: string) => {
+    if (window.confirm("Deseja realmente excluir este produto?")) {
+        try {
+            await deleteProduct(id);
+        } catch (err) {
+            alert("Erro ao excluir produto.");
+        }
     }
-    setShowProductModal(false);
-    setEditingProduct(null);
   };
 
   const handleAddCategory = (e: React.FormEvent) => {
@@ -64,14 +72,6 @@ const MenuManagement: React.FC<Props> = ({ products, setProducts, categories, se
     }
     setCategories([...categories, newCategoryName.trim()]);
     setNewCategoryName('');
-  };
-
-  const handleDeleteCategory = (cat: string) => {
-    if (products.some(p => p.category === cat)) {
-        alert("Não é possível remover uma categoria que possui produtos vinculados.");
-        return;
-    }
-    setCategories(categories.filter(c => c !== cat));
   };
 
   const days = [
@@ -120,12 +120,12 @@ const MenuManagement: React.FC<Props> = ({ products, setProducts, categories, se
               <button onClick={() => { setEditingProduct(product); setShowProductModal(true); }} className="p-2 bg-white rounded-lg shadow text-blue-500 hover:bg-blue-50">
                 <Edit2 size={16} />
               </button>
-              <button onClick={() => setProducts(products.filter(p => p.id !== product.id))} className="p-2 bg-white rounded-lg shadow text-red-500 hover:bg-red-50">
+              <button onClick={() => handleDelete(product.id)} className="p-2 bg-white rounded-lg shadow text-red-500 hover:bg-red-50">
                 <Trash2 size={16} />
               </button>
             </div>
 
-            {product.featuredDay !== undefined && (
+            {product.featuredDay !== undefined && product.featuredDay !== -1 && (
                 <div className="absolute top-2 left-2 z-10 bg-yellow-400 text-white text-[10px] font-bold px-2 py-1 rounded shadow flex items-center gap-1">
                     <Star size={10} fill="currentColor" /> OFERTA: {days.find(d => d.id === product.featuredDay)?.name}
                 </div>
@@ -138,6 +138,7 @@ const MenuManagement: React.FC<Props> = ({ products, setProducts, categories, se
                 {product.category}
               </span>
               <h3 className="font-bold text-gray-800 mt-2">{product.name}</h3>
+              <p className="text-xs text-gray-400 line-clamp-1 mb-1">{product.description}</p>
               <p className="text-sm font-bold text-[#3d251e] mt-1">R$ {product.price.toFixed(2)}</p>
               
               <div className="mt-3 flex items-center justify-between">
@@ -151,7 +152,6 @@ const MenuManagement: React.FC<Props> = ({ products, setProducts, categories, se
         ))}
       </div>
 
-      {/* Product Modal */}
       {showProductModal && (
         <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
           <div className="bg-white w-full max-w-lg rounded-3xl overflow-hidden shadow-2xl animate-scale-up">
@@ -176,7 +176,11 @@ const MenuManagement: React.FC<Props> = ({ products, setProducts, categories, se
                     onChange={(e) => {
                        const file = e.target.files?.[0];
                        if (file) {
-                        setEditingProduct({...editingProduct, imageUrl: URL.createObjectURL(file)});
+                        const reader = new FileReader();
+                        reader.onloadend = () => {
+                            setEditingProduct({...editingProduct, imageUrl: reader.result as string});
+                        };
+                        reader.readAsDataURL(file);
                        }
                     }}
                   />
@@ -262,14 +266,15 @@ const MenuManagement: React.FC<Props> = ({ products, setProducts, categories, se
 
               <div className="pt-4 flex gap-3">
                 <button type="button" onClick={() => setShowProductModal(false)} className="flex-1 py-3 text-gray-500 font-bold hover:bg-gray-50 rounded-xl transition-colors">Cancelar</button>
-                <button type="submit" className="flex-1 py-3 bg-[#3d251e] text-white font-bold rounded-xl hover:bg-black transition-colors shadow-lg">Salvar Produto</button>
+                <button type="submit" disabled={isSaving} className="flex-1 py-3 bg-[#3d251e] text-white font-bold rounded-xl hover:bg-black transition-colors shadow-lg flex items-center justify-center gap-2">
+                    {isSaving ? <Loader2 className="animate-spin" size={20} /> : 'Salvar Produto'}
+                </button>
               </div>
             </form>
           </div>
         </div>
       )}
 
-      {/* Category Management Modal */}
       {showCategoryModal && (
         <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
             <div className="bg-white w-full max-w-md rounded-3xl overflow-hidden shadow-2xl animate-scale-up">
@@ -292,17 +297,10 @@ const MenuManagement: React.FC<Props> = ({ products, setProducts, categories, se
                             Adicionar
                         </button>
                     </form>
-
                     <div className="space-y-2 max-h-64 overflow-auto">
                         {categories.map(cat => (
                             <div key={cat} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl group">
                                 <span className="font-medium text-gray-700">{cat}</span>
-                                <button 
-                                    onClick={() => handleDeleteCategory(cat)}
-                                    className="p-2 text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
-                                >
-                                    <Trash2 size={16} />
-                                </button>
                             </div>
                         ))}
                     </div>
