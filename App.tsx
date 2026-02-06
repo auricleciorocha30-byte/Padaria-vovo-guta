@@ -61,12 +61,18 @@ export default function App() {
 
     fetchInitialData();
 
-    // SINCRONIZAÇÃO REALTIME (SUPABASE)
+    // CONFIGURAÇÃO REALTIME SUPABASE
     const channel = supabase
-      .channel('db-changes')
+      .channel('schema-db-changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, (payload) => {
         if (payload.eventType === 'INSERT') {
-          setOrders(prev => [payload.new as Order, ...prev]);
+          const newOrder = payload.new as Order;
+          setOrders(prev => {
+            const exists = prev.some(o => o.id === newOrder.id);
+            if (exists) return prev;
+            return [newOrder, ...prev];
+          });
+          // Feedback sonoro para novo pedido
           try { new Audio('https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3').play(); } catch(e) {}
         } else if (payload.eventType === 'UPDATE') {
           setOrders(prev => prev.map(o => o.id === payload.new.id ? (payload.new as Order) : o));
@@ -97,10 +103,10 @@ export default function App() {
   }, []);
 
   const addOrder = async (order: Order) => {
-    // CORREÇÃO CRÍTICA: Nunca envia 'type' nulo e garante campos mínimos obrigatórios
+    // PROTEÇÃO CONTRA VALORES NULOS
     const payload = {
-      id: order.id,
-      type: order.type || 'BALCAO', // Fallback caso type venha vazio
+      id: order.id || Math.random().toString(36).substr(2, 9).toUpperCase(),
+      type: order.type || 'BALCAO', // Garante que nunca seja nulo
       items: order.items,
       total: order.total,
       status: order.status || 'PREPARANDO',
@@ -179,12 +185,12 @@ function AdminLayout({ settings }: { settings: StoreSettings }) {
           </Link>
 
           <div className="pt-6 pb-2 px-3">
-              <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Links Externos</p>
+              <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Atendimento Externo</p>
           </div>
           
           <a href="#/cardapio" target="_blank" rel="noopener noreferrer" className="flex items-center justify-between p-3 rounded-xl hover:bg-white/5 text-gray-300 group">
             <div className="flex items-center gap-3">
-              <Utensils size={20} /> <span>Cardápio Digital</span>
+              <Utensils size={20} /> <span>Ver Cardápio</span>
             </div>
             <ExternalLink size={14} className="opacity-0 group-hover:opacity-100 transition-opacity" />
           </a>

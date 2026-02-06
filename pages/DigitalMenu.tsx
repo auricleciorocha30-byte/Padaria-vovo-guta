@@ -61,10 +61,10 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
     
     setIsSending(true);
     
-    // Objeto de pedido robusto
+    // Objeto de pedido com TYPE garantido
     const finalOrder: Order = {
       id: Math.random().toString(36).substr(2, 9).toUpperCase(),
-      type: isWaitstaff ? 'MESA' : orderType, // NUNCA NULO
+      type: isWaitstaff ? 'MESA' : (orderType || 'BALCAO'), 
       items: cart,
       status: 'PREPARANDO',
       total: cartTotal,
@@ -83,7 +83,7 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
         if (isWaitstaff) onLogout();
     } catch (err: any) {
         console.error("Erro no checkout:", err);
-        alert(`❌ Falha ao enviar: ${err.message || 'Erro de conexão'}`);
+        alert(`❌ Falha ao enviar: ${err.message || 'Erro de conexão no banco'}`);
     } finally {
         setIsSending(false);
     }
@@ -96,9 +96,9 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
           <div className="flex items-center gap-4">
             <button onClick={onLogout} className="p-2 hover:bg-white/10 rounded-full transition-colors"><ChevronLeft size={24} /></button>
             <div className="flex flex-col">
-                <h1 className="font-brand text-lg font-bold leading-none">{isWaitstaff ? 'Modo Garçom' : settings.storeName}</h1>
+                <h1 className="font-brand text-lg font-bold leading-none">{isWaitstaff ? 'Painel Garçom' : settings.storeName}</h1>
                 <span className="text-[10px] opacity-70 uppercase tracking-widest mt-1">
-                    {tableNumber ? `Mesa ${tableNumber}` : 'Auto-atendimento'}
+                    {tableNumber ? `Mesa ${tableNumber}` : 'Cardápio Digital'}
                 </span>
             </div>
           </div>
@@ -110,12 +110,12 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
       </header>
 
       <main className="max-w-4xl mx-auto px-4 py-6 space-y-6 pb-20">
-        {/* Barra de Busca com Lupa */}
+        {/* Busca com Lupa */}
         <div className="relative group">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-orange-500 transition-colors" size={22} />
           <input 
             type="text" 
-            placeholder="Pesquisar no cardápio..." 
+            placeholder="Buscar por nome ou descrição..." 
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full pl-12 pr-4 py-4 bg-white border-2 border-transparent focus:border-orange-500 rounded-3xl outline-none shadow-sm font-medium transition-all"
@@ -135,7 +135,7 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
             ))}
         </div>
 
-        {/* Produtos */}
+        {/* Lista de Produtos */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {filteredProducts.map(product => (
             <div key={product.id} className="bg-white rounded-[2rem] p-4 shadow-sm flex gap-4 items-center border border-gray-50 hover:border-orange-100 transition-colors">
@@ -152,15 +152,18 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
               </div>
             </div>
           ))}
+          {filteredProducts.length === 0 && (
+            <div className="col-span-full py-10 text-center text-gray-400 font-medium">Nenhum produto encontrado.</div>
+          )}
         </div>
       </main>
 
-      {/* Modal de Checkout */}
+      {/* Checkout Modal */}
       {isCartOpen && (
         <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-end sm:items-center justify-center p-4">
           <div className="bg-white w-full max-w-lg rounded-t-[3rem] sm:rounded-[3rem] overflow-hidden flex flex-col max-h-[90vh] shadow-2xl animate-slide-up">
             <div className="p-8 border-b flex items-center justify-between">
-              <h2 className="font-bold text-xl">{checkoutStep === 'cart' ? 'Sacola' : 'Finalizar'}</h2>
+              <h2 className="font-bold text-xl">{checkoutStep === 'cart' ? 'Sacola de Pedidos' : 'Finalizar Atendimento'}</h2>
               <button onClick={() => setIsCartOpen(false)} className="p-2 text-gray-400 hover:bg-gray-100 rounded-full"><X size={24} /></button>
             </div>
 
@@ -173,7 +176,7 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
                       <button onClick={() => removeFromCart(item.productId)} className="text-red-300 hover:text-red-600"><Trash2 size={18} /></button>
                     </div>
                   ))}
-                  <textarea placeholder="Observações do pedido..." value={notes} onChange={e => setNotes(e.target.value)} className="w-full p-4 bg-gray-50 border-2 border-gray-100 rounded-2xl outline-none focus:border-orange-500" />
+                  <textarea placeholder="Observações do pedido (ex: sem cebola)..." value={notes} onChange={e => setNotes(e.target.value)} className="w-full p-4 bg-gray-50 border-2 border-gray-100 rounded-2xl outline-none focus:border-orange-500" />
                 </div>
               ) : (
                 <div className="space-y-6">
@@ -193,7 +196,7 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
 
             <div className="p-8 bg-gray-50 border-t">
               <div className="flex justify-between items-center mb-6">
-                <span className="text-gray-400 text-xs font-bold uppercase tracking-widest">Total</span>
+                <span className="text-gray-400 text-xs font-bold uppercase tracking-widest">Valor Total</span>
                 <span className="text-3xl font-brand font-bold">R$ {cartTotal.toFixed(2)}</span>
               </div>
               <div className="flex gap-2">
@@ -203,17 +206,13 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
                     onClick={() => checkoutStep === 'cart' ? (isWaitstaff ? handleCheckout() : setCheckoutStep('details')) : handleCheckout()}
                     className={`flex-1 py-4 rounded-2xl font-bold text-white shadow-xl flex items-center justify-center gap-2 ${isWaitstaff ? 'bg-[#f68c3e]' : 'bg-[#3d251e]'} disabled:opacity-50`}
                   >
-                    {isSending ? <Loader2 className="animate-spin"/> : <>{checkoutStep === 'cart' && !isWaitstaff ? 'Próximo' : <><Send size={18}/> {isWaitstaff ? 'Lançar Mesa' : 'Enviar Pedido'}</>}</>}
+                    {isSending ? <Loader2 className="animate-spin"/> : <>{checkoutStep === 'cart' && !isWaitstaff ? 'Próximo Passo' : <><Send size={18}/> {isWaitstaff ? 'Lançar Pedido' : 'Confirmar Pedido'}</>}</>}
                   </button>
               </div>
             </div>
           </div>
         </div>
       )}
-      <style>{`
-        .animate-slide-up { animation: slideUp 0.3s ease-out; }
-        @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
-      `}</style>
     </div>
   );
 };
