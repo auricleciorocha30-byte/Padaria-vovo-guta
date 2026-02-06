@@ -27,7 +27,6 @@ import OrdersList from './pages/OrdersList.tsx';
 import StoreSettingsPage from './pages/StoreSettingsPage.tsx';
 import DigitalMenu from './pages/DigitalMenu.tsx';
 import TVBoard from './pages/TVBoard.tsx';
-import TableLogin from './pages/TableLogin.tsx';
 import WaitressPanel from './pages/WaitressPanel.tsx';
 import WeeklyOffers from './pages/WeeklyOffers.tsx';
 import LoginPage from './pages/LoginPage.tsx';
@@ -138,7 +137,12 @@ export default function App() {
     const wasWaitstaff = isWaitstaff;
     setActiveTable(null);
     setIsWaitstaff(false);
-    window.location.hash = wasWaitstaff ? '/garconete' : '/mesa/login';
+    // Se era garçom, volta para o painel de mesas. Se era cliente, apenas limpa a sessão no cardápio.
+    if (wasWaitstaff) {
+        window.location.hash = '/garconete';
+    } else {
+        window.location.hash = '/cardapio';
+    }
   };
 
   if (authLoading) return <div className="min-h-screen flex items-center justify-center bg-[#fff5e1]"><Loader2 className="animate-spin text-[#3d251e]" size={48} /></div>;
@@ -155,10 +159,11 @@ export default function App() {
           <Route path="ofertas" element={<WeeklyOffers products={products} saveProduct={async (p) => { await supabase.from('products').upsert(p); }} />} />
           <Route path="configuracoes" element={<StoreSettingsPage settings={settings} setSettings={async (s) => { await supabase.from('settings').upsert({ id: 'store', data: s }); setSettings(s); }} />} />
         </Route>
-        <Route path="/mesa/login" element={<TableLogin onLogin={(t) => { setActiveTable(t); setIsWaitstaff(false); }} />} />
         <Route path="/garconete" element={<WaitressPanel orders={orders} onSelectTable={(t) => { setActiveTable(t); setIsWaitstaff(true); }} />} />
         <Route path="/cardapio" element={<DigitalMenu products={products} categories={categories} settings={settings} orders={orders} addOrder={addOrder} tableNumber={activeTable} onLogout={handleLogout} isWaitstaff={isWaitstaff} />} />
         <Route path="/tv" element={<TVBoard orders={orders} settings={settings} products={products} />} />
+        {/* Redireciona qualquer acesso antigo para o cardápio direto */}
+        <Route path="/mesa/login" element={<Navigate to="/cardapio" replace />} />
       </Routes>
     </HashRouter>
   );

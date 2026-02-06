@@ -1,6 +1,7 @@
 
-import React, { useState, useMemo } from 'react';
-import { ShoppingCart, X, ChevronLeft, Trash2, Plus as PlusIcon, CheckCircle, Loader2, Send, Search, LayoutGrid, RotateCcw, Clock, AlertTriangle, Star, Flame, Ban } from 'lucide-react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { ShoppingCart, X, ChevronLeft, Trash2, Plus as PlusIcon, CheckCircle, Loader2, Send, Search, LayoutGrid, RotateCcw, Clock, AlertTriangle, Star, Flame, Ban, Hash } from 'lucide-react';
 import { Product, StoreSettings, Order, OrderItem, OrderType, PaymentMethod } from '../types';
 
 interface Props {
@@ -14,15 +15,20 @@ interface Props {
   isWaitstaff?: boolean;
 }
 
-const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories, settings, orders, addOrder, tableNumber, onLogout, isWaitstaff = false }) => {
+const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories, settings, orders, addOrder, tableNumber: initialTable, onLogout, isWaitstaff = false }) => {
+  const [searchParams] = useSearchParams();
+  const urlTable = searchParams.get('mesa');
+  
   const [cart, setCart] = useState<OrderItem[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [checkoutStep, setCheckoutStep] = useState<'cart' | 'details' | 'success'>('cart');
   const [activeCategory, setActiveCategory] = useState('Todos');
   const [searchTerm, setSearchTerm] = useState('');
   
-  const [orderType, setOrderType] = useState<OrderType>(tableNumber ? 'MESA' : 'BALCAO');
-  const [manualTable, setManualTable] = useState(tableNumber || '');
+  const effectiveTable = initialTable || urlTable || null;
+  
+  const [orderType, setOrderType] = useState<OrderType>(effectiveTable ? 'MESA' : 'BALCAO');
+  const [manualTable, setManualTable] = useState(effectiveTable || '');
   const [payment, setPayment] = useState<PaymentMethod>('PIX');
   const [notes, setNotes] = useState('');
   const [isSending, setIsSending] = useState(false);
@@ -35,7 +41,6 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
   // Identifica a oferta do dia
   const todayOffer = useMemo(() => {
     const today = new Date().getDay();
-    // Mostramos mesmo se estiver inativo para manter o layout, mas bloqueamos a compra
     return products.find(p => p.featuredDay === today);
   }, [products]);
 
@@ -69,7 +74,7 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
 
   const handleCheckout = async () => {
     if (cart.length === 0) return;
-    if (orderType === 'MESA' && !manualTable && !tableNumber) { alert('Informe a mesa'); return; }
+    if (orderType === 'MESA' && !manualTable) { alert('Informe o número da mesa'); return; }
     
     setIsSending(true);
     
@@ -82,7 +87,7 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
       createdAt: Date.now(),
       paymentMethod: payment,
       notes: notes.trim() || undefined,
-      tableNumber: tableNumber || manualTable || undefined
+      tableNumber: manualTable || undefined
     };
 
     try {
@@ -131,7 +136,7 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
             <div className="flex flex-col">
                 <h1 className="font-brand text-lg font-bold leading-none">{isWaitstaff ? 'Painel Garçom' : settings.storeName}</h1>
                 <span className="text-[10px] opacity-70 uppercase tracking-widest mt-1">
-                    {tableNumber ? `Mesa ${tableNumber}` : 'Cardápio Digital'}
+                    {effectiveTable ? `Mesa ${effectiveTable}` : 'Cardápio Digital'}
                 </span>
             </div>
           </div>
@@ -301,7 +306,18 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
                         )}
                     </div>
                   )}
-                  {orderType === 'MESA' && !tableNumber && <input type="text" placeholder="Número da Mesa" value={manualTable} onChange={e => setManualTable(e.target.value)} className="w-full p-4 bg-gray-50 border-2 border-gray-100 rounded-2xl outline-none focus:border-orange-500" />}
+                  {orderType === 'MESA' && (
+                    <div className="relative">
+                      <Hash className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                      <input 
+                        type="text" 
+                        placeholder="Número da Mesa" 
+                        value={manualTable} 
+                        onChange={e => setManualTable(e.target.value)} 
+                        className="w-full pl-12 pr-4 py-4 bg-gray-50 border-2 border-gray-100 rounded-2xl outline-none focus:border-orange-500 font-bold" 
+                      />
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -320,7 +336,7 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
                             onClick={() => { setCheckoutStep('cart'); setIsCartOpen(false); }} 
                             className="w-full py-4 bg-gray-100 text-gray-700 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-gray-200 transition-colors"
                         >
-                            <RotateCcw size={18} /> Novo pedido nesta mesa
+                            <RotateCcw size={18} /> Novo pedido
                         </button>
                         <button 
                             onClick={onLogout} 
