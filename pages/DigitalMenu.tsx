@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo } from 'react';
-import { ShoppingCart, X, ChevronLeft, Trash2, Plus as PlusIcon, CheckCircle, Loader2, Send, Search, LayoutGrid, RotateCcw, Clock, AlertTriangle } from 'lucide-react';
+import { ShoppingCart, X, ChevronLeft, Trash2, Plus as PlusIcon, CheckCircle, Loader2, Send, Search, LayoutGrid, RotateCcw, Clock, AlertTriangle, Star, Flame, Ban } from 'lucide-react';
 import { Product, StoreSettings, Order, OrderItem, OrderType, PaymentMethod } from '../types';
 
 interface Props {
@@ -31,6 +31,13 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
   const isStoreOpen = useMemo(() => {
     return settings.isDeliveryActive || settings.isTableOrderActive || settings.isCounterPickupActive;
   }, [settings]);
+
+  // Identifica a oferta do dia
+  const todayOffer = useMemo(() => {
+    const today = new Date().getDay();
+    // Mostramos mesmo se estiver inativo para manter o layout, mas bloqueamos a compra
+    return products.find(p => p.featuredDay === today);
+  }, [products]);
 
   const categories = useMemo(() => ['Todos', ...externalCategories], [externalCategories]);
   
@@ -90,7 +97,6 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
     }
   };
 
-  // Se a loja estiver fechada e não for acesso de funcionário (garçom)
   if (!isStoreOpen && !isWaitstaff) {
     return (
       <div className="min-h-screen bg-[#fff5e1] flex flex-col items-center justify-center p-8 text-center">
@@ -155,6 +161,48 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
           />
         </div>
 
+        {/* OFERTA DO DIA EM DESTAQUE */}
+        {todayOffer && activeCategory === 'Todos' && !searchTerm && (
+          <div className={`relative overflow-hidden bg-gradient-to-br ${todayOffer.isActive ? 'from-[#3d251e] to-[#2a1a15]' : 'from-gray-400 to-gray-600'} rounded-[2.5rem] p-1 shadow-2xl transition-all`}>
+            <div className="bg-white/5 rounded-[2.4rem] p-6 flex flex-col sm:flex-row gap-6 items-center relative">
+              <div className={`relative w-full sm:w-48 aspect-square shrink-0 ${!todayOffer.isActive ? 'grayscale opacity-50' : ''}`}>
+                <img src={todayOffer.imageUrl} className="w-full h-full object-cover rounded-3xl shadow-lg border-4 border-orange-500/20" alt={todayOffer.name} />
+                <div className="absolute -top-2 -right-2 bg-yellow-400 text-[#3d251e] px-3 py-1 rounded-full font-black text-[10px] uppercase shadow-lg flex items-center gap-1">
+                  <Star size={12} fill="currentColor" /> Oferta de Hoje
+                </div>
+              </div>
+              <div className="flex-1 text-white text-center sm:text-left space-y-2">
+                <h2 className={`text-2xl font-brand font-bold ${todayOffer.isActive ? 'text-orange-400' : 'text-gray-200'} leading-none`}>{todayOffer.name}</h2>
+                <p className="text-xs text-gray-300 line-clamp-2">{todayOffer.description}</p>
+                <div className="flex items-center justify-between sm:justify-start gap-4 pt-2">
+                  <div className="flex flex-col">
+                    <span className="text-[10px] text-gray-400 uppercase font-bold tracking-tighter">Preço Especial</span>
+                    <span className="text-3xl font-bold text-white">R$ {todayOffer.price.toFixed(2)}</span>
+                  </div>
+                  {todayOffer.isActive ? (
+                    <button 
+                      onClick={() => addToCart(todayOffer)}
+                      className="px-6 py-3 bg-[#f68c3e] hover:bg-orange-600 text-white rounded-2xl font-bold shadow-xl transition-all active:scale-95 flex items-center gap-2"
+                    >
+                      <PlusIcon size={18} /> Quero este!
+                    </button>
+                  ) : (
+                    <div className="px-6 py-3 bg-white/10 border border-white/20 text-white rounded-2xl font-bold flex items-center gap-2 italic text-sm">
+                      <Ban size={18} /> Indisponível
+                    </div>
+                  )}
+                </div>
+              </div>
+              {!todayOffer.isActive && (
+                <div className="absolute inset-0 flex items-center justify-center bg-black/20 pointer-events-none">
+                   <div className="bg-red-600 text-white px-8 py-2 rounded-full font-black text-xs uppercase tracking-widest shadow-2xl rotate-12">Sem Estoque</div>
+                </div>
+              )}
+            </div>
+            {todayOffer.isActive && <Flame className="absolute -bottom-4 -right-4 text-orange-500/10 w-32 h-32 rotate-12" />}
+          </div>
+        )}
+
         <div className="flex gap-2 overflow-x-auto no-scrollbar py-2">
             {categories.map(cat => (
               <button 
@@ -169,16 +217,32 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {filteredProducts.map(product => (
-            <div key={product.id} className="bg-white rounded-[2rem] p-4 shadow-sm flex gap-4 items-center border border-gray-50 hover:border-orange-100 transition-colors">
-              <img src={product.imageUrl} className="w-20 h-20 object-cover rounded-2xl" alt={product.name} />
+            <div key={product.id} className={`bg-white rounded-[2rem] p-4 shadow-sm flex gap-4 items-center border border-gray-50 hover:border-orange-100 transition-all ${!product.isActive ? 'opacity-60 grayscale' : ''}`}>
+              <div className="relative">
+                <img src={product.imageUrl} className="w-20 h-20 object-cover rounded-2xl" alt={product.name} />
+                {!product.isActive && (
+                    <div className="absolute inset-0 bg-black/40 rounded-2xl flex items-center justify-center">
+                        <Ban size={24} className="text-white opacity-80" />
+                    </div>
+                )}
+              </div>
               <div className="flex-1">
-                <h3 className="font-bold text-sm">{product.name}</h3>
+                <div className="flex items-center gap-2">
+                  <h3 className={`font-bold text-sm ${!product.isActive ? 'text-gray-400 line-through' : ''}`}>{product.name}</h3>
+                  {product.featuredDay !== undefined && (
+                    <Star size={10} className="text-yellow-500" fill="currentColor" />
+                  )}
+                </div>
                 <p className="text-[10px] text-gray-400 line-clamp-1">{product.description}</p>
                 <div className="flex items-center justify-between mt-3">
-                  <span className="font-bold text-orange-600">R$ {product.price.toFixed(2)}</span>
-                  <button onClick={() => addToCart(product)} className={`w-9 h-9 rounded-xl text-white flex items-center justify-center shadow-lg active:scale-90 transition-transform ${isWaitstaff ? 'bg-[#f68c3e]' : 'bg-[#3d251e]'}`}>
-                    <PlusIcon size={20} />
-                  </button>
+                  <span className={`font-bold ${product.isActive ? 'text-orange-600' : 'text-gray-300'}`}>R$ {product.price.toFixed(2)}</span>
+                  {product.isActive ? (
+                    <button onClick={() => addToCart(product)} className={`w-9 h-9 rounded-xl text-white flex items-center justify-center shadow-lg active:scale-90 transition-transform ${isWaitstaff ? 'bg-[#f68c3e]' : 'bg-[#3d251e]'}`}>
+                      <PlusIcon size={20} />
+                    </button>
+                  ) : (
+                    <span className="text-[9px] font-black text-red-400 border border-red-100 px-2 py-1 rounded-lg uppercase tracking-tight">Esgotado</span>
+                  )}
                 </div>
               </div>
             </div>
