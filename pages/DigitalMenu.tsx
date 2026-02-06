@@ -25,8 +25,9 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
   const [activeCategory, setActiveCategory] = useState('Todos');
   const [searchTerm, setSearchTerm] = useState('');
   
+  // Estados para o Seletor de Peso
   const [weightProduct, setWeightProduct] = useState<Product | null>(null);
-  const [selectedWeight, setSelectedWeight] = useState<string>("100"); // Armazenado como string para o input
+  const [selectedWeightGrams, setSelectedWeightGrams] = useState<string>("100");
 
   const effectiveTable = initialTable || urlTable || null;
   const [orderType, setOrderType] = useState<OrderType>(effectiveTable ? 'MESA' : 'BALCAO');
@@ -60,10 +61,10 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
   const handleAddToCart = (product: Product, quantityOverride?: number) => {
     if (!product.isActive || !isStoreOpen) return;
 
-    // Se o produto é por KG e ainda não abrimos o modal, abre ele.
-    if (product.isByWeight && quantityOverride === undefined) {
+    // Se o produto é vendido por peso e não foi passado um peso específico ainda
+    if (!!product.isByWeight && quantityOverride === undefined) {
         setWeightProduct(product);
-        setSelectedWeight("100");
+        setSelectedWeightGrams("100");
         return;
     }
 
@@ -79,7 +80,7 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
           name: product.name, 
           price: product.price, 
           quantity: finalQuantity,
-          isByWeight: product.isByWeight 
+          isByWeight: !!product.isByWeight 
       }];
     });
 
@@ -136,7 +137,7 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
     onLogout(); 
   };
 
-  const currentWeightGrams = parseInt(selectedWeight) || 0;
+  const currentWeightInput = parseInt(selectedWeightGrams) || 0;
 
   return (
     <div className="min-h-screen bg-[#fff5e1] text-[#3d251e]">
@@ -149,9 +150,9 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
                 <h1 className="font-brand text-lg font-bold leading-none">{isWaitstaff ? 'Painel Equipe' : settings.storeName}</h1>
             </div>
           </div>
-          <button onClick={() => { setIsCartOpen(true); setCheckoutStep('cart'); }} className="relative p-2 bg-white/10 rounded-full">
+          <button onClick={() => { setIsCartOpen(true); setCheckoutStep('cart'); }} className="relative p-2 bg-white/10 rounded-full transition-transform active:scale-90">
             <ShoppingCart size={24} />
-            {cart.length > 0 && <span className="absolute -top-1 -right-1 bg-red-600 text-[10px] w-5 h-5 flex items-center justify-center rounded-full font-bold">{cart.length}</span>}
+            {cart.length > 0 && <span className="absolute -top-1 -right-1 bg-red-600 text-[10px] w-5 h-5 flex items-center justify-center rounded-full font-bold animate-pulse">{cart.length}</span>}
           </button>
         </div>
       </header>
@@ -159,7 +160,7 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
       <main className="max-w-4xl mx-auto px-4 py-6 space-y-6 pb-20">
         <div className="relative group">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={22} />
-          <input type="text" placeholder="O que você procura hoje?" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-12 pr-4 py-4 bg-white rounded-3xl outline-none shadow-sm" />
+          <input type="text" placeholder="O que você procura hoje?" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-12 pr-4 py-4 bg-white rounded-3xl outline-none shadow-sm focus:ring-2 focus:ring-orange-500 transition-all" />
         </div>
 
         {todayOffer && activeCategory === 'Todos' && !searchTerm && (
@@ -175,7 +176,7 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
                 <p className="text-xs text-gray-300 mt-1">{todayOffer.description}</p>
                 <div className="flex items-center justify-between sm:justify-start gap-4 mt-4">
                   <span className="text-3xl font-bold">R$ {todayOffer.price.toFixed(2)} {todayOffer.isByWeight ? '/ KG' : ''}</span>
-                  <button onClick={() => handleAddToCart(todayOffer)} className="px-6 py-3 bg-[#f68c3e] text-white rounded-2xl font-bold flex items-center gap-2">
+                  <button onClick={() => handleAddToCart(todayOffer)} className="px-6 py-3 bg-[#f68c3e] text-white rounded-2xl font-bold flex items-center gap-2 hover:bg-orange-600 transition-colors shadow-xl">
                     <PlusIcon size={18} /> Adicionar
                   </button>
                 </div>
@@ -185,13 +186,13 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
 
         <div className="flex gap-2 overflow-x-auto no-scrollbar py-2">
             {categories.map(cat => (
-              <button key={cat} onClick={() => { setActiveCategory(cat); setSearchTerm(''); }} className={`px-6 py-2 rounded-2xl whitespace-nowrap font-bold text-sm border transition-all ${activeCategory === cat ? 'bg-[#3d251e] text-white border-[#3d251e]' : 'bg-white text-gray-400 border-gray-100'}`}>{cat}</button>
+              <button key={cat} onClick={() => { setActiveCategory(cat); setSearchTerm(''); }} className={`px-6 py-2 rounded-2xl whitespace-nowrap font-bold text-sm border transition-all ${activeCategory === cat ? 'bg-[#3d251e] text-white border-[#3d251e] shadow-md' : 'bg-white text-gray-400 border-gray-100 hover:bg-gray-50'}`}>{cat}</button>
             ))}
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {filteredProducts.map(product => (
-            <div key={product.id} className={`bg-white rounded-[2rem] p-4 shadow-sm flex gap-4 items-center border border-gray-50 transition-all ${!product.isActive ? 'opacity-50 grayscale' : ''}`}>
+            <div key={product.id} className={`bg-white rounded-[2rem] p-4 shadow-sm flex gap-4 items-center border border-gray-50 transition-all ${!product.isActive ? 'opacity-50 grayscale' : 'hover:shadow-md'}`}>
               <img src={product.imageUrl} className="w-20 h-20 object-cover rounded-2xl" />
               <div className="flex-1">
                 <h3 className="font-bold text-sm">{product.name}</h3>
@@ -199,12 +200,12 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
                 <div className="flex items-center justify-between mt-3">
                   <span className="font-bold text-orange-600">R$ {product.price.toFixed(2)} {product.isByWeight ? '/ KG' : ''}</span>
                   {product.isActive ? (
-                    <button onClick={() => handleAddToCart(product)} className={`w-9 h-9 rounded-xl text-white flex items-center justify-center shadow-lg ${isWaitstaff ? 'bg-[#f68c3e]' : 'bg-[#3d251e]'}`}>
+                    <button onClick={() => handleAddToCart(product)} className={`w-10 h-10 rounded-xl text-white flex items-center justify-center shadow-lg transition-transform active:scale-90 ${isWaitstaff ? 'bg-[#f68c3e]' : 'bg-[#3d251e]'}`}>
                       <PlusIcon size={20} />
                     </button>
                   ) : (
-                    <span className="text-[9px] font-black text-red-500 bg-red-50 px-2 py-1 rounded-lg flex items-center gap-1">
-                        <Ban size={10} /> ESGOTADO
+                    <span className="text-[9px] font-black text-red-500 bg-red-50 px-2 py-1 rounded-lg flex items-center gap-1 uppercase">
+                        <Ban size={10} /> Indisponível
                     </span>
                   )}
                 </div>
@@ -214,36 +215,39 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
         </div>
       </main>
 
-      {/* Modal de Peso (KG) - ATUALIZADO COM INPUT DE GRAMAS */}
+      {/* MODAL DE PESO (Venda por KG) - Ajustado para GRAMAS */}
       {weightProduct && (
         <div className="fixed inset-0 z-[60] bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
             <div className="bg-white w-full max-w-sm rounded-[3rem] p-8 space-y-6 text-center shadow-2xl animate-scale-up">
-                <div className="w-20 h-20 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto">
+                <div className="w-20 h-20 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto shadow-inner">
                     <Weight size={40} />
                 </div>
                 <div>
                     <h2 className="text-xl font-bold">{weightProduct.name}</h2>
-                    <p className="text-xs text-gray-400">Quanto você deseja? (em gramas)</p>
+                    <p className="text-xs text-gray-400">Quanto você deseja? (Peso em Gramas)</p>
                 </div>
                 
-                <div className="bg-gray-50 p-6 rounded-[2rem] border border-gray-100">
+                <div className="bg-gray-50 p-6 rounded-[2rem] border border-gray-200">
                     <div className="flex flex-col items-center gap-4">
-                        <input 
-                            type="number" 
-                            autoFocus
-                            value={selectedWeight}
-                            onChange={(e) => setSelectedWeight(e.target.value)}
-                            className="w-full bg-white text-center text-4xl font-black text-[#3d251e] p-4 rounded-2xl border-2 border-transparent focus:border-blue-500 outline-none"
-                            placeholder="0"
-                        />
-                        <div className="flex gap-2">
-                             {[50, 100, 250, 500].map(val => (
+                        <div className="relative w-full">
+                            <input 
+                                type="number" 
+                                autoFocus
+                                value={selectedWeightGrams}
+                                onChange={(e) => setSelectedWeightGrams(e.target.value)}
+                                className="w-full bg-white text-center text-4xl font-black text-[#3d251e] p-4 rounded-2xl border-2 border-transparent focus:border-blue-500 outline-none shadow-sm"
+                                placeholder="0"
+                            />
+                            <span className="absolute right-4 top-1/2 -translate-y-1/2 font-bold text-gray-400">g</span>
+                        </div>
+                        <div className="flex gap-2 flex-wrap justify-center">
+                             {[100, 200, 300, 500, 1000].map(val => (
                                  <button 
                                     key={val}
-                                    onClick={() => setSelectedWeight(val.toString())}
-                                    className="px-3 py-2 bg-white rounded-xl text-[10px] font-bold shadow-sm border border-gray-100 hover:bg-gray-50"
+                                    onClick={() => setSelectedWeightGrams(val.toString())}
+                                    className="px-4 py-2 bg-white rounded-xl text-[10px] font-bold shadow-sm border border-gray-200 hover:bg-blue-50 hover:border-blue-200 transition-all"
                                  >
-                                    +{val}g
+                                    {val >= 1000 ? `${val/1000}kg` : `${val}g`}
                                  </button>
                              ))}
                         </div>
@@ -251,20 +255,20 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
                 </div>
 
                 <div className="pt-2">
-                    <p className="text-xs text-gray-400 mb-1">Preço proporcional</p>
-                    <p className="text-3xl font-bold text-orange-600">
-                        R$ {((weightProduct.price * currentWeightGrams) / 1000).toFixed(2)}
+                    <p className="text-xs text-gray-400 mb-1 font-bold uppercase tracking-widest">Valor do Pedido</p>
+                    <p className="text-4xl font-black text-orange-600">
+                        R$ {((weightProduct.price * currentWeightInput) / 1000).toFixed(2)}
                     </p>
                 </div>
 
                 <div className="flex gap-3">
-                    <button onClick={() => setWeightProduct(null)} className="flex-1 py-4 text-gray-500 font-bold">Cancelar</button>
+                    <button onClick={() => setWeightProduct(null)} className="flex-1 py-4 text-gray-400 font-bold hover:bg-gray-50 rounded-2xl transition-colors">Cancelar</button>
                     <button 
-                        disabled={currentWeightGrams <= 0}
-                        onClick={() => handleAddToCart(weightProduct, currentWeightGrams / 1000)} 
-                        className="flex-1 py-4 bg-[#3d251e] text-white rounded-2xl font-bold shadow-xl disabled:opacity-50"
+                        disabled={currentWeightInput <= 0}
+                        onClick={() => handleAddToCart(weightProduct, currentWeightInput / 1000)} 
+                        className="flex-1 py-4 bg-[#3d251e] text-white rounded-2xl font-bold shadow-xl disabled:opacity-30 transition-all active:scale-95"
                     >
-                        Confirmar
+                        Adicionar
                     </button>
                 </div>
             </div>
@@ -273,31 +277,47 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
 
       {isCartOpen && (
         <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-end sm:items-center justify-center p-4">
-          <div className="bg-white w-full max-w-lg rounded-t-[3rem] sm:rounded-[3rem] overflow-hidden flex flex-col max-h-[90vh] shadow-2xl">
+          <div className="bg-white w-full max-w-lg rounded-t-[3rem] sm:rounded-[3rem] overflow-hidden flex flex-col max-h-[90vh] shadow-2xl animate-slide-up">
             {checkoutStep !== 'success' && (
-              <div className="p-8 border-b flex items-center justify-between">
-                <h2 className="font-bold text-xl">{checkoutStep === 'cart' ? 'Sacola' : 'Finalizar'}</h2>
-                <button onClick={() => setIsCartOpen(false)} className="p-2 text-gray-400"><X size={24} /></button>
+              <div className="p-8 border-b flex items-center justify-between bg-gray-50">
+                <h2 className="font-bold text-xl">{checkoutStep === 'cart' ? 'Sua Sacola' : 'Finalizar Pedido'}</h2>
+                <button onClick={() => setIsCartOpen(false)} className="p-2 text-gray-400 hover:text-black transition-colors"><X size={24} /></button>
               </div>
             )}
 
-            <div className="flex-1 overflow-auto p-8 space-y-6">
+            <div className="flex-1 overflow-auto p-8 space-y-6 custom-scrollbar">
               {checkoutStep === 'cart' && (
                 <div className="space-y-4">
-                  {cart.length === 0 ? <div className="py-10 text-center text-gray-400">Vazio</div> : 
+                  {cart.length === 0 ? <div className="py-10 text-center text-gray-400 italic">Sua sacola está vazia...</div> : 
                     cart.map((item, idx) => (
-                      <div key={idx} className="flex justify-between items-center bg-gray-50 p-4 rounded-2xl">
-                        <div>
-                            <p className="font-bold text-sm">{item.name}</p>
-                            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-tight">
-                                {item.isByWeight ? `${(item.quantity * 1000).toFixed(0)}g` : `${item.quantity}x`} • R$ {(item.price * item.quantity).toFixed(2)}
-                            </p>
+                      <div key={idx} className="flex justify-between items-center bg-gray-50 p-5 rounded-[2rem] border border-gray-100">
+                        <div className="flex-1">
+                            <p className="font-bold text-sm text-gray-800">{item.name}</p>
+                            <div className="flex items-center gap-2 mt-1">
+                                {item.isByWeight ? (
+                                    <span className="text-[10px] font-black bg-blue-100 text-blue-700 px-2 py-0.5 rounded uppercase flex items-center gap-1">
+                                        <Weight size={10} /> {(item.quantity * 1000).toFixed(0)}g
+                                    </span>
+                                ) : (
+                                    <span className="text-[10px] font-black bg-gray-200 text-gray-600 px-2 py-0.5 rounded uppercase">
+                                        {item.quantity} UN
+                                    </span>
+                                )}
+                                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter">
+                                    • R$ {(item.price * item.quantity).toFixed(2)}
+                                </span>
+                            </div>
                         </div>
-                        <button onClick={() => removeFromCart(item.productId)} className="text-red-300"><Trash2 size={18} /></button>
+                        <button onClick={() => removeFromCart(item.productId)} className="p-3 text-red-300 hover:text-red-500 transition-colors"><Trash2 size={20} /></button>
                       </div>
                     ))
                   }
-                  {cart.length > 0 && <textarea placeholder="Observações..." value={notes} onChange={e => setNotes(e.target.value)} className="w-full p-4 bg-gray-50 rounded-2xl outline-none focus:ring-1 focus:ring-orange-500 min-h-[100px]" />}
+                  {cart.length > 0 && (
+                      <div className="pt-4">
+                          <label className="text-[10px] font-bold text-gray-400 uppercase ml-4 mb-1 block tracking-widest">Observações Especiais</label>
+                          <textarea placeholder="Ex: Sem cebola, bem passado..." value={notes} onChange={e => setNotes(e.target.value)} className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none focus:ring-1 focus:ring-orange-500 min-h-[100px] text-sm" />
+                      </div>
+                  )}
                 </div>
               )}
 
@@ -305,53 +325,26 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
                 <div className="space-y-6">
                    {!isWaitstaff && (
                     <div className="grid grid-cols-3 gap-2">
-                        {settings.isTableOrderActive && <button onClick={() => setOrderType('MESA')} className={`p-4 rounded-2xl border-2 text-[10px] font-bold ${orderType === 'MESA' ? 'border-[#f68c3e] bg-orange-50 text-[#f68c3e]' : 'border-gray-50'}`}>MESA</button>}
-                        {settings.isCounterPickupActive && <button onClick={() => setOrderType('BALCAO')} className={`p-4 rounded-2xl border-2 text-[10px] font-bold ${orderType === 'BALCAO' ? 'border-[#f68c3e] bg-orange-50 text-[#f68c3e]' : 'border-gray-50'}`}>BALCÃO</button>}
-                        {settings.isDeliveryActive && <button onClick={() => setOrderType('ENTREGA')} className={`p-4 rounded-2xl border-2 text-[10px] font-bold ${orderType === 'ENTREGA' ? 'border-[#f68c3e] bg-orange-50 text-[#f68c3e]' : 'border-gray-50'}`}>ENTREGA</button>}
+                        {settings.isTableOrderActive && <button onClick={() => setOrderType('MESA')} className={`p-4 rounded-2xl border-2 text-[10px] font-bold transition-all ${orderType === 'MESA' ? 'border-[#f68c3e] bg-orange-50 text-[#f68c3e]' : 'border-gray-50 text-gray-400'}`}>MESA</button>}
+                        {settings.isCounterPickupActive && <button onClick={() => setOrderType('BALCAO')} className={`p-4 rounded-2xl border-2 text-[10px] font-bold transition-all ${orderType === 'BALCAO' ? 'border-[#f68c3e] bg-orange-50 text-[#f68c3e]' : 'border-gray-50 text-gray-400'}`}>BALCÃO</button>}
+                        {settings.isDeliveryActive && <button onClick={() => setOrderType('ENTREGA')} className={`p-4 rounded-2xl border-2 text-[10px] font-bold transition-all ${orderType === 'ENTREGA' ? 'border-[#f68c3e] bg-orange-50 text-[#f68c3e]' : 'border-gray-50 text-gray-400'}`}>ENTREGA</button>}
                     </div>
                   )}
 
                   <div className="space-y-4">
-                    {orderType === 'MESA' && <input type="text" placeholder="Mesa" value={manualTable} onChange={e => setManualTable(e.target.value)} className="w-full p-4 bg-gray-50 rounded-2xl font-bold" />}
+                    {orderType === 'MESA' && <input type="text" placeholder="Número da Mesa" value={manualTable} onChange={e => setManualTable(e.target.value)} className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl font-bold focus:ring-2 focus:ring-orange-500 outline-none" />}
                     {(orderType === 'ENTREGA' || orderType === 'BALCAO') && (
                       <>
-                        <input type="text" placeholder="Seu Nome *" value={customerName} onChange={e => setCustomerName(e.target.value)} className="w-full p-4 bg-gray-50 rounded-2xl font-bold" />
-                        <input type="tel" placeholder="WhatsApp *" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} className="w-full p-4 bg-gray-50 rounded-2xl font-bold" />
+                        <input type="text" placeholder="Seu Nome *" value={customerName} onChange={e => setCustomerName(e.target.value)} className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl font-bold focus:ring-2 focus:ring-orange-500 outline-none" />
+                        <input type="tel" placeholder="WhatsApp / Telefone *" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl font-bold focus:ring-2 focus:ring-orange-500 outline-none" />
                       </>
                     )}
-                    {orderType === 'ENTREGA' && <textarea placeholder="Endereço *" value={deliveryAddress} onChange={e => setDeliveryAddress(e.target.value)} className="w-full p-4 bg-gray-50 rounded-2xl font-bold" />}
+                    {orderType === 'ENTREGA' && <textarea placeholder="Endereço Completo para Entrega *" value={deliveryAddress} onChange={e => setDeliveryAddress(e.target.value)} className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl font-bold focus:ring-2 focus:ring-orange-500 outline-none min-h-[100px]" />}
                   </div>
                 </div>
               )}
 
               {checkoutStep === 'success' && (
                 <div className="flex flex-col items-center justify-center py-10 text-center space-y-6">
-                    <div className="w-24 h-24 bg-green-100 text-green-600 rounded-full flex items-center justify-center animate-bounce"><CheckCircle size={56} /></div>
-                    <div><h2 className="text-2xl font-bold">Pedido Enviado!</h2><p className="text-gray-500">Aguarde o chamado no painel.</p></div>
-                    <button onClick={handleFinalizeAndExit} className="w-full py-4 bg-[#3d251e] text-white rounded-2xl font-bold shadow-xl">Finalizar e Sair</button>
-                </div>
-              )}
-            </div>
-
-            {checkoutStep !== 'success' && (
-              <div className="p-8 bg-gray-50 border-t">
-                <div className="flex justify-between items-center mb-6">
-                  <span className="text-gray-400 text-xs font-bold uppercase">Total</span>
-                  <span className="text-3xl font-brand font-bold">R$ {cartTotal.toFixed(2)}</span>
-                </div>
-                <div className="flex gap-2">
-                    {checkoutStep === 'details' && <button onClick={() => setCheckoutStep('cart')} className="px-6 py-4 bg-white border-2 border-gray-100 rounded-2xl"><ChevronLeft/></button>}
-                    <button disabled={cart.length === 0 || isSending} onClick={() => checkoutStep === 'cart' ? (isWaitstaff ? handleCheckout() : setCheckoutStep('details')) : handleCheckout()} className={`flex-1 py-4 rounded-2xl font-bold text-white shadow-xl flex items-center justify-center gap-2 ${isWaitstaff ? 'bg-[#f68c3e]' : 'bg-[#3d251e]'} disabled:opacity-50`}>
-                      {isSending ? <Loader2 className="animate-spin"/> : checkoutStep === 'cart' ? 'Continuar' : 'Enviar Pedido'}
-                    </button>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
-
-export default DigitalMenu;
+                    <div className="w-24 h-24 bg-green-100 text-green-600 rounded-full flex items-center justify-center animate-bounce shadow-inner"><CheckCircle size={56} /></div>
+                    <div><h2 className="text-2xl font-bold text-[#3d251e]">Pedido Enviado!</h2><p className="text-gray-500 max-w-xs mx-auto">Seu pedido já está em nossa cozinha. Acompanhe pelo painel da

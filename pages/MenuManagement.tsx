@@ -37,7 +37,7 @@ const MenuManagement: React.FC<Props> = ({ products, saveProduct, deleteProduct,
             imageUrl: editingProduct.imageUrl || 'https://picsum.photos/400/300',
             isActive: editingProduct.isActive ?? true,
             featuredDay: editingProduct.featuredDay === -1 ? undefined : editingProduct.featuredDay,
-            isByWeight: editingProduct.isByWeight ?? false
+            isByWeight: !!editingProduct.isByWeight
         };
 
         await saveProduct(productData as Product);
@@ -108,13 +108,13 @@ const MenuManagement: React.FC<Props> = ({ products, saveProduct, deleteProduct,
 
             {!product.isActive && (
                 <div className="absolute inset-0 bg-white/40 flex items-center justify-center z-10 pointer-events-none">
-                    <span className="bg-red-600 text-white text-[10px] font-black px-4 py-1 rounded-full shadow-lg rotate-12">FORA DE ESTOQUE</span>
+                    <span className="bg-red-600 text-white text-[10px] font-black px-4 py-1 rounded-full shadow-lg rotate-12 uppercase">Fora de Estoque</span>
                 </div>
             )}
 
             {product.isByWeight && (
-                <div className="absolute top-2 left-2 z-10 bg-blue-500 text-white text-[9px] font-black px-2 py-1 rounded shadow-md flex items-center gap-1">
-                    <Weight size={10} /> KG
+                <div className="absolute top-2 left-2 z-10 bg-blue-500 text-white text-[9px] font-black px-2 py-1 rounded shadow-md flex items-center gap-1 uppercase">
+                    <Weight size={10} /> Venda por KG
                 </div>
             )}
             
@@ -144,21 +144,27 @@ const MenuManagement: React.FC<Props> = ({ products, saveProduct, deleteProduct,
             </div>
             <form onSubmit={handleSaveProduct} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto custom-scrollbar">
               
-              {/* Opção de Ativar/Desativar no Estoque */}
-              <div className="bg-orange-50 p-4 rounded-2xl flex items-center justify-between border border-orange-100">
-                  <div className="flex items-center gap-3">
-                      <div className={`p-2 rounded-xl ${editingProduct?.isActive ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-400'}`}>
-                        <Power size={20} />
+              <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-orange-50 p-4 rounded-2xl flex items-center justify-between border border-orange-100">
+                      <div className="flex items-center gap-2">
+                        <Power size={18} className={editingProduct?.isActive ? 'text-green-600' : 'text-gray-400'} />
+                        <span className="text-[10px] font-bold uppercase text-gray-500">Em Estoque</span>
                       </div>
-                      <div>
-                          <p className="text-sm font-bold text-gray-800">Status no Cardápio</p>
-                          <p className="text-[10px] text-gray-500">Produto disponível para os clientes?</p>
-                      </div>
+                      <Switch 
+                        checked={editingProduct?.isActive ?? true} 
+                        onChange={(v) => setEditingProduct({...editingProduct, isActive: v})} 
+                      />
                   </div>
-                  <Switch 
-                    checked={editingProduct?.isActive ?? true} 
-                    onChange={(v) => setEditingProduct({...editingProduct, isActive: v})} 
-                  />
+                  <div className="bg-blue-50 p-4 rounded-2xl flex items-center justify-between border border-blue-100">
+                      <div className="flex items-center gap-2">
+                        <Weight size={18} className={editingProduct?.isByWeight ? 'text-blue-600' : 'text-gray-400'} />
+                        <span className="text-[10px] font-bold uppercase text-gray-500">Venda por KG</span>
+                      </div>
+                      <Switch 
+                        checked={editingProduct?.isByWeight ?? false} 
+                        onChange={(v) => setEditingProduct({...editingProduct, isByWeight: v})} 
+                      />
+                  </div>
               </div>
 
               <div className="flex gap-4 items-center">
@@ -178,50 +184,43 @@ const MenuManagement: React.FC<Props> = ({ products, saveProduct, deleteProduct,
                   }} />
                 </div>
                 <div className="flex-1">
-                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Nome</label>
-                  <input required type="text" value={editingProduct?.name || ''} onChange={(e) => setEditingProduct({...editingProduct, name: e.target.value})} className="w-full p-2 border border-gray-200 rounded-lg" />
+                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Nome do Produto</label>
+                  <input required type="text" value={editingProduct?.name || ''} onChange={(e) => setEditingProduct({...editingProduct, name: e.target.value})} className="w-full p-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-orange-500 outline-none" />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Descrição</label>
-                <textarea required rows={2} value={editingProduct?.description || ''} onChange={(e) => setEditingProduct({...editingProduct, description: e.target.value})} className="w-full p-3 border border-gray-200 rounded-lg resize-none text-sm" />
+                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Descrição / Ingredientes</label>
+                <textarea required rows={2} value={editingProduct?.description || ''} onChange={(e) => setEditingProduct({...editingProduct, description: e.target.value})} className="w-full p-3 border border-gray-200 rounded-lg resize-none text-sm focus:ring-2 focus:ring-orange-500 outline-none" />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Preço {editingProduct?.isByWeight ? '(por KG)' : '(Unidade)'}</label>
-                  <input required type="number" step="0.01" value={editingProduct?.price || ''} onChange={(e) => setEditingProduct({...editingProduct, price: parseFloat(e.target.value)})} className="w-full p-2 border border-gray-200 rounded-lg" />
+                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">
+                    {editingProduct?.isByWeight ? 'Preço por KG (R$)' : 'Preço Unitário (R$)'}
+                  </label>
+                  <input required type="number" step="0.01" value={editingProduct?.price || ''} onChange={(e) => setEditingProduct({...editingProduct, price: parseFloat(e.target.value)})} className="w-full p-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-orange-500 outline-none" />
                 </div>
-                <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Venda por KG?</label>
-                  <div className="flex items-center gap-3 mt-1">
-                    <Switch checked={editingProduct?.isByWeight ?? false} onChange={(v) => setEditingProduct({...editingProduct, isByWeight: v})} />
-                    <span className="text-sm font-medium">{editingProduct?.isByWeight ? 'Sim (Peso)' : 'Não (Unidade)'}</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Categoria</label>
-                  <select required value={editingProduct?.category || ''} onChange={(e) => setEditingProduct({...editingProduct, category: e.target.value})} className="w-full p-2 border border-gray-200 rounded-lg bg-white">
+                  <select required value={editingProduct?.category || ''} onChange={(e) => setEditingProduct({...editingProduct, category: e.target.value})} className="w-full p-2 border border-gray-200 rounded-lg bg-white focus:ring-2 focus:ring-orange-500 outline-none">
                       {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
                   </select>
                 </div>
-                <div>
-                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Oferta do Dia</label>
-                    <select value={editingProduct?.featuredDay ?? -1} onChange={(e) => setEditingProduct({...editingProduct, featuredDay: parseInt(e.target.value)})} className="w-full p-2 border border-gray-200 rounded-lg bg-white">
-                        <option value="-1">Nenhum</option>
-                        {days.map((day) => <option key={day.id} value={day.id}>{day.name}</option>)}
-                    </select>
-                </div>
+              </div>
+
+              <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Oferta do Dia (Destaque Automático)</label>
+                  <select value={editingProduct?.featuredDay ?? -1} onChange={(e) => setEditingProduct({...editingProduct, featuredDay: parseInt(e.target.value)})} className="w-full p-2 border border-gray-200 rounded-lg bg-white focus:ring-2 focus:ring-orange-500 outline-none">
+                      <option value="-1">Nenhuma (Não destacar)</option>
+                      {days.map((day) => <option key={day.id} value={day.id}>{day.name}</option>)}
+                  </select>
               </div>
 
               <div className="pt-4 flex gap-3">
                 <button type="button" onClick={() => setShowProductModal(false)} className="flex-1 py-3 text-gray-500 font-bold hover:bg-gray-50 rounded-xl">Cancelar</button>
-                <button type="submit" disabled={isSaving} className="flex-1 py-3 bg-[#3d251e] text-white font-bold rounded-xl hover:bg-black flex items-center justify-center gap-2">
-                    {isSaving ? <Loader2 className="animate-spin" size={20} /> : 'Salvar'}
+                <button type="submit" disabled={isSaving} className="flex-1 py-3 bg-[#3d251e] text-white font-bold rounded-xl hover:bg-black flex items-center justify-center gap-2 shadow-lg">
+                    {isSaving ? <Loader2 className="animate-spin" size={20} /> : 'Salvar Alterações'}
                 </button>
               </div>
             </form>
