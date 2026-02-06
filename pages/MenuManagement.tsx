@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { Product } from '../types';
-import { Plus, Search, Edit2, Trash2, Camera, Star, CheckCircle, XCircle, Tag, X, AlignLeft, Loader2, Weight, Power } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, Camera, Star, Tag, X, Loader2, Weight, Power } from 'lucide-react';
 import { Switch } from '../components/Switch';
 
 interface Props {
@@ -12,12 +12,10 @@ interface Props {
   setCategories: (c: string[]) => void;
 }
 
-const MenuManagement: React.FC<Props> = ({ products, saveProduct, deleteProduct, categories, setCategories }) => {
+const MenuManagement: React.FC<Props> = ({ products, saveProduct, deleteProduct, categories }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showProductModal, setShowProductModal] = useState(false);
-  const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Partial<Product> | null>(null);
-  const [newCategoryName, setNewCategoryName] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
   const filtered = products.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()));
@@ -35,9 +33,9 @@ const MenuManagement: React.FC<Props> = ({ products, saveProduct, deleteProduct,
             price: editingProduct.price || 0,
             category: editingProduct.category || categories[0] || 'Geral',
             imageUrl: editingProduct.imageUrl || 'https://picsum.photos/400/300',
-            isActive: editingProduct.isActive ?? true,
+            isActive: editingProduct.isActive !== false, // Default true
             featuredDay: editingProduct.featuredDay === -1 ? undefined : editingProduct.featuredDay,
-            isByWeight: !!editingProduct.isByWeight
+            isByWeight: !!editingProduct.isByWeight // Garante que seja booleano
         };
 
         await saveProduct(productData as Product);
@@ -75,23 +73,15 @@ const MenuManagement: React.FC<Props> = ({ products, saveProduct, deleteProduct,
             placeholder="Buscar produtos..." 
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-3 bg-white border border-gray-100 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none"
+            className="w-full pl-10 pr-4 py-3 bg-white border border-gray-100 rounded-xl outline-none"
           />
         </div>
-        <div className="flex flex-col w-full md:w-auto gap-2">
-            <button 
-                onClick={() => { setEditingProduct({ category: categories[0] || '', description: '', featuredDay: -1, isActive: true, isByWeight: false }); setShowProductModal(true); }}
-                className="px-6 py-3 bg-[#f68c3e] text-white font-bold rounded-xl flex items-center justify-center gap-2 hover:bg-orange-600 transition-colors shadow-md"
-            >
-                <Plus size={20} /> Novo Produto
-            </button>
-            <button 
-                onClick={() => setShowCategoryModal(true)}
-                className="px-6 py-2 bg-white text-gray-600 border border-gray-200 font-bold rounded-xl flex items-center justify-center gap-2 hover:bg-gray-50 transition-colors text-sm"
-            >
-                <Tag size={16} /> Gerenciar Categorias
-            </button>
-        </div>
+        <button 
+            onClick={() => { setEditingProduct({ category: categories[0] || '', featuredDay: -1, isActive: true, isByWeight: false }); setShowProductModal(true); }}
+            className="px-6 py-3 bg-[#f68c3e] text-white font-bold rounded-xl flex items-center justify-center gap-2 hover:bg-orange-600 transition-colors shadow-md w-full md:w-auto"
+        >
+            <Plus size={20} /> Novo Produto
+        </button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
@@ -105,21 +95,17 @@ const MenuManagement: React.FC<Props> = ({ products, saveProduct, deleteProduct,
                 <Trash2 size={16} />
               </button>
             </div>
-
             {!product.isActive && (
                 <div className="absolute inset-0 bg-white/40 flex items-center justify-center z-10 pointer-events-none">
                     <span className="bg-red-600 text-white text-[10px] font-black px-4 py-1 rounded-full shadow-lg rotate-12 uppercase">Fora de Estoque</span>
                 </div>
             )}
-
             {product.isByWeight && (
                 <div className="absolute top-2 left-2 z-10 bg-blue-500 text-white text-[9px] font-black px-2 py-1 rounded shadow-md flex items-center gap-1 uppercase">
-                    <Weight size={10} /> Venda por KG
+                    <Weight size={10} /> KG
                 </div>
             )}
-            
             <img src={product.imageUrl} className="w-full h-40 object-cover" alt={product.name} />
-            
             <div className="p-4">
               <div className="flex justify-between items-start">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-orange-600 bg-orange-50 px-2 py-1 rounded">
@@ -128,7 +114,6 @@ const MenuManagement: React.FC<Props> = ({ products, saveProduct, deleteProduct,
                   {product.featuredDay !== undefined && <Star size={14} className="text-yellow-500 fill-current" />}
               </div>
               <h3 className="font-bold text-gray-800 mt-2">{product.name}</h3>
-              <p className="text-xs text-gray-400 line-clamp-1 mb-1">{product.description}</p>
               <p className="text-sm font-bold text-[#3d251e] mt-1">R$ {product.price.toFixed(2)} {product.isByWeight ? '/ KG' : ''}</p>
             </div>
           </div>
@@ -142,38 +127,26 @@ const MenuManagement: React.FC<Props> = ({ products, saveProduct, deleteProduct,
               <h2 className="text-xl font-bold">{editingProduct?.id ? 'Editar Produto' : 'Cadastrar Produto'}</h2>
               <button onClick={() => setShowProductModal(false)} className="text-gray-400"><X /></button>
             </div>
-            <form onSubmit={handleSaveProduct} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto custom-scrollbar">
-              
+            <form onSubmit={handleSaveProduct} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
               <div className="grid grid-cols-2 gap-4">
                   <div className="bg-orange-50 p-4 rounded-2xl flex items-center justify-between border border-orange-100">
                       <div className="flex items-center gap-2">
                         <Power size={18} className={editingProduct?.isActive ? 'text-green-600' : 'text-gray-400'} />
-                        <span className="text-[10px] font-bold uppercase text-gray-500">Em Estoque</span>
+                        <span className="text-[10px] font-bold uppercase text-gray-500">Ativo</span>
                       </div>
-                      <Switch 
-                        checked={editingProduct?.isActive ?? true} 
-                        onChange={(v) => setEditingProduct({...editingProduct, isActive: v})} 
-                      />
+                      <Switch checked={editingProduct?.isActive ?? true} onChange={(v) => setEditingProduct({...editingProduct, isActive: v})} />
                   </div>
                   <div className="bg-blue-50 p-4 rounded-2xl flex items-center justify-between border border-blue-100">
                       <div className="flex items-center gap-2">
                         <Weight size={18} className={editingProduct?.isByWeight ? 'text-blue-600' : 'text-gray-400'} />
-                        <span className="text-[10px] font-bold uppercase text-gray-500">Venda por KG</span>
+                        <span className="text-[10px] font-bold uppercase text-gray-500">Por KG</span>
                       </div>
-                      <Switch 
-                        checked={editingProduct?.isByWeight ?? false} 
-                        onChange={(v) => setEditingProduct({...editingProduct, isByWeight: v})} 
-                      />
+                      <Switch checked={editingProduct?.isByWeight ?? false} onChange={(v) => setEditingProduct({...editingProduct, isByWeight: v})} />
                   </div>
               </div>
-
               <div className="flex gap-4 items-center">
                 <div className="w-24 h-24 bg-gray-100 rounded-xl flex flex-col items-center justify-center text-gray-400 border-2 border-dashed border-gray-200 cursor-pointer overflow-hidden relative">
-                  {editingProduct?.imageUrl ? (
-                    <img src={editingProduct.imageUrl} className="w-full h-full object-cover" />
-                  ) : (
-                    <> <Camera size={24} /> <span className="text-[10px]">Upload</span> </>
-                  )}
+                  {editingProduct?.imageUrl ? ( <img src={editingProduct.imageUrl} className="w-full h-full object-cover" alt="Preview" /> ) : ( <> <Camera size={24} /> <span className="text-[10px]">Foto</span> </> )}
                   <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" onChange={(e) => {
                        const file = e.target.files?.[0];
                        if (file) {
@@ -184,44 +157,25 @@ const MenuManagement: React.FC<Props> = ({ products, saveProduct, deleteProduct,
                   }} />
                 </div>
                 <div className="flex-1">
-                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Nome do Produto</label>
-                  <input required type="text" value={editingProduct?.name || ''} onChange={(e) => setEditingProduct({...editingProduct, name: e.target.value})} className="w-full p-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-orange-500 outline-none" />
+                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Nome</label>
+                  <input required type="text" value={editingProduct?.name || ''} onChange={(e) => setEditingProduct({...editingProduct, name: e.target.value})} className="w-full p-2 border border-gray-200 rounded-lg outline-none" />
                 </div>
               </div>
-
-              <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Descrição / Ingredientes</label>
-                <textarea required rows={2} value={editingProduct?.description || ''} onChange={(e) => setEditingProduct({...editingProduct, description: e.target.value})} className="w-full p-3 border border-gray-200 rounded-lg resize-none text-sm focus:ring-2 focus:ring-orange-500 outline-none" />
-              </div>
-
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">
-                    {editingProduct?.isByWeight ? 'Preço por KG (R$)' : 'Preço Unitário (R$)'}
-                  </label>
-                  <input required type="number" step="0.01" value={editingProduct?.price || ''} onChange={(e) => setEditingProduct({...editingProduct, price: parseFloat(e.target.value)})} className="w-full p-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-orange-500 outline-none" />
+                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">{editingProduct?.isByWeight ? 'Preço/KG' : 'Preço/UN'}</label>
+                  <input required type="number" step="0.01" value={editingProduct?.price || ''} onChange={(e) => setEditingProduct({...editingProduct, price: parseFloat(e.target.value)})} className="w-full p-2 border border-gray-200 rounded-lg outline-none" />
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Categoria</label>
-                  <select required value={editingProduct?.category || ''} onChange={(e) => setEditingProduct({...editingProduct, category: e.target.value})} className="w-full p-2 border border-gray-200 rounded-lg bg-white focus:ring-2 focus:ring-orange-500 outline-none">
+                  <select required value={editingProduct?.category || ''} onChange={(e) => setEditingProduct({...editingProduct, category: e.target.value})} className="w-full p-2 border border-gray-200 rounded-lg bg-white outline-none">
                       {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
                   </select>
                 </div>
               </div>
-
-              <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Oferta do Dia (Destaque Automático)</label>
-                  <select value={editingProduct?.featuredDay ?? -1} onChange={(e) => setEditingProduct({...editingProduct, featuredDay: parseInt(e.target.value)})} className="w-full p-2 border border-gray-200 rounded-lg bg-white focus:ring-2 focus:ring-orange-500 outline-none">
-                      <option value="-1">Nenhuma (Não destacar)</option>
-                      {days.map((day) => <option key={day.id} value={day.id}>{day.name}</option>)}
-                  </select>
-              </div>
-
               <div className="pt-4 flex gap-3">
-                <button type="button" onClick={() => setShowProductModal(false)} className="flex-1 py-3 text-gray-500 font-bold hover:bg-gray-50 rounded-xl">Cancelar</button>
-                <button type="submit" disabled={isSaving} className="flex-1 py-3 bg-[#3d251e] text-white font-bold rounded-xl hover:bg-black flex items-center justify-center gap-2 shadow-lg">
-                    {isSaving ? <Loader2 className="animate-spin" size={20} /> : 'Salvar Alterações'}
-                </button>
+                <button type="button" onClick={() => setShowProductModal(false)} className="flex-1 py-3 text-gray-500 font-bold">Cancelar</button>
+                <button type="submit" disabled={isSaving} className="flex-1 py-3 bg-[#3d251e] text-white font-bold rounded-xl shadow-lg"> {isSaving ? 'Salvando...' : 'Salvar'} </button>
               </div>
             </form>
           </div>
