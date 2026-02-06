@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo } from 'react';
-import { ShoppingCart, X, ChevronLeft, Trash2, Plus as PlusIcon, CheckCircle, Loader2, Send, Search, LayoutGrid, RotateCcw } from 'lucide-react';
+import { ShoppingCart, X, ChevronLeft, Trash2, Plus as PlusIcon, CheckCircle, Loader2, Send, Search, LayoutGrid, RotateCcw, Clock, AlertTriangle } from 'lucide-react';
 import { Product, StoreSettings, Order, OrderItem, OrderType, PaymentMethod } from '../types';
 
 interface Props {
@@ -27,6 +27,11 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
   const [notes, setNotes] = useState('');
   const [isSending, setIsSending] = useState(false);
 
+  // Verifica se a loja está aberta (pelo menos um canal ativo)
+  const isStoreOpen = useMemo(() => {
+    return settings.isDeliveryActive || settings.isTableOrderActive || settings.isCounterPickupActive;
+  }, [settings]);
+
   const categories = useMemo(() => ['Todos', ...externalCategories], [externalCategories]);
   
   const filteredProducts = useMemo(() => {
@@ -39,7 +44,7 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
   }, [products, activeCategory, searchTerm]);
   
   const addToCart = (product: Product) => {
-    if (!product.isActive) return;
+    if (!product.isActive || !isStoreOpen) return;
     setCart(prev => {
       const existing = prev.find(item => item.productId === product.id);
       if (existing) {
@@ -85,12 +90,38 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
     }
   };
 
+  // Se a loja estiver fechada e não for acesso de funcionário (garçom)
+  if (!isStoreOpen && !isWaitstaff) {
+    return (
+      <div className="min-h-screen bg-[#fff5e1] flex flex-col items-center justify-center p-8 text-center">
+        <div className="w-32 h-32 bg-white rounded-full flex items-center justify-center shadow-xl mb-8">
+            <img src={settings.logoUrl} alt="Logo" className="w-24 h-24 rounded-full object-cover grayscale opacity-50" />
+        </div>
+        <div className="bg-white p-10 rounded-[3rem] shadow-xl max-w-md border border-orange-100">
+            <Clock size={64} className="text-orange-500 mx-auto mb-6" />
+            <h1 className="text-3xl font-brand font-bold text-[#3d251e] mb-4">Loja Fechada</h1>
+            <p className="text-gray-500 mb-8 leading-relaxed">
+                No momento não estamos aceitando novos pedidos. Por favor, verifique nosso horário de funcionamento ou entre em contato.
+            </p>
+            <button 
+                onClick={onLogout}
+                className="w-full py-4 bg-[#3d251e] text-white rounded-2xl font-bold shadow-xl hover:bg-black transition-all"
+            >
+                Voltar ao Início
+            </button>
+        </div>
+        <p className="mt-8 text-xs text-gray-400 uppercase tracking-widest font-bold">{settings.storeName}</p>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[#fff5e1] text-[#3d251e]">
       <header className={`sticky top-0 z-20 shadow-lg ${isWaitstaff ? 'bg-[#f68c3e]' : 'bg-[#3d251e]'} text-white p-6`}>
         <div className="max-w-4xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-4">
             <button onClick={onLogout} className="p-2 hover:bg-white/10 rounded-full transition-colors"><ChevronLeft size={24} /></button>
+            <img src={settings.logoUrl} className="w-10 h-10 rounded-full border-2 border-white/20 object-cover" alt="Logo" />
             <div className="flex flex-col">
                 <h1 className="font-brand text-lg font-bold leading-none">{isWaitstaff ? 'Painel Garçom' : settings.storeName}</h1>
                 <span className="text-[10px] opacity-70 uppercase tracking-widest mt-1">
@@ -106,6 +137,13 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
       </header>
 
       <main className="max-w-4xl mx-auto px-4 py-6 space-y-6 pb-20">
+        {!isStoreOpen && isWaitstaff && (
+            <div className="bg-orange-50 border border-orange-200 p-4 rounded-2xl flex items-center gap-3 text-orange-800 text-sm font-bold animate-pulse">
+                <AlertTriangle size={20} />
+                MODO ADMIN: Loja está fechada para clientes externos.
+            </div>
+        )}
+
         <div className="relative group">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-orange-500" size={22} />
           <input 
@@ -162,13 +200,19 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
             <div className="flex-1 overflow-auto p-8 space-y-6">
               {checkoutStep === 'cart' && (
                 <div className="space-y-4">
-                  {cart.map(item => (
-                    <div key={item.productId} className="flex justify-between items-center bg-gray-50 p-4 rounded-2xl">
-                      <div><p className="font-bold text-sm">{item.name}</p><p className="text-xs text-gray-400">{item.quantity}x R$ {item.price.toFixed(2)}</p></div>
-                      <button onClick={() => removeFromCart(item.productId)} className="text-red-300 hover:text-red-600"><Trash2 size={18} /></button>
-                    </div>
-                  ))}
-                  <textarea placeholder="Observações (opcional)..." value={notes} onChange={e => setNotes(e.target.value)} className="w-full p-4 bg-gray-50 border-2 border-gray-100 rounded-2xl outline-none focus:border-orange-500" />
+                  {cart.length === 0 ? (
+                      <div className="py-10 text-center text-gray-400 italic">Sua sacola está vazia</div>
+                  ) : (
+                      cart.map(item => (
+                        <div key={item.productId} className="flex justify-between items-center bg-gray-50 p-4 rounded-2xl">
+                          <div><p className="font-bold text-sm">{item.name}</p><p className="text-xs text-gray-400">{item.quantity}x R$ {item.price.toFixed(2)}</p></div>
+                          <button onClick={() => removeFromCart(item.productId)} className="text-red-300 hover:text-red-600"><Trash2 size={18} /></button>
+                        </div>
+                      ))
+                  )}
+                  {cart.length > 0 && (
+                      <textarea placeholder="Observações (opcional)..." value={notes} onChange={e => setNotes(e.target.value)} className="w-full p-4 bg-gray-50 border-2 border-gray-100 rounded-2xl outline-none focus:border-orange-500" />
+                  )}
                 </div>
               )}
 
@@ -176,11 +220,21 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
                 <div className="space-y-6">
                    {!isWaitstaff && (
                     <div className="grid grid-cols-3 gap-2">
-                        {['MESA', 'BALCAO', 'ENTREGA'].map(t => (
-                            <button key={t} onClick={() => setOrderType(t as any)} className={`p-4 rounded-2xl border-2 text-[10px] font-bold ${orderType === t ? 'border-[#f68c3e] bg-orange-50 text-[#f68c3e]' : 'border-gray-50'}`}>
-                                {t}
+                        {settings.isTableOrderActive && (
+                            <button onClick={() => setOrderType('MESA')} className={`p-4 rounded-2xl border-2 text-[10px] font-bold ${orderType === 'MESA' ? 'border-[#f68c3e] bg-orange-50 text-[#f68c3e]' : 'border-gray-50'}`}>
+                                MESA
                             </button>
-                        ))}
+                        )}
+                        {settings.isCounterPickupActive && (
+                            <button onClick={() => setOrderType('BALCAO')} className={`p-4 rounded-2xl border-2 text-[10px] font-bold ${orderType === 'BALCAO' ? 'border-[#f68c3e] bg-orange-50 text-[#f68c3e]' : 'border-gray-50'}`}>
+                                BALCÃO
+                            </button>
+                        )}
+                        {settings.isDeliveryActive && (
+                            <button onClick={() => setOrderType('ENTREGA')} className={`p-4 rounded-2xl border-2 text-[10px] font-bold ${orderType === 'ENTREGA' ? 'border-[#f68c3e] bg-orange-50 text-[#f68c3e]' : 'border-gray-50'}`}>
+                                ENTREGA
+                            </button>
+                        )}
                     </div>
                   )}
                   {orderType === 'MESA' && !tableNumber && <input type="text" placeholder="Número da Mesa" value={manualTable} onChange={e => setManualTable(e.target.value)} className="w-full p-4 bg-gray-50 border-2 border-gray-100 rounded-2xl outline-none focus:border-orange-500" />}
