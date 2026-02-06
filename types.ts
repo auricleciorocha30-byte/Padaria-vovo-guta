@@ -1,6 +1,7 @@
 
 export type OrderStatus = 'PREPARANDO' | 'PRONTO' | 'ENTREGUE' | 'CANCELADO';
 export type OrderType = 'MESA' | 'BALCAO' | 'ENTREGA';
+export type PaymentMethod = 'PIX' | 'CARTAO' | 'DINHEIRO';
 
 export interface Product {
   id: string;
@@ -29,6 +30,10 @@ export interface Order {
   status: OrderStatus;
   total: number;
   createdAt: number;
+  paymentMethod?: PaymentMethod;
+  deliveryAddress?: string;
+  notes?: string;
+  changeFor?: number;
 }
 
 export interface StoreSettings {
@@ -39,7 +44,6 @@ export interface StoreSettings {
   logoUrl: string;
   primaryColor: string;
   secondaryColor: string;
-  // New Waitstaff Permissions
   canWaitstaffFinishOrder: boolean;
   canWaitstaffCancelItems: boolean;
   thermalPrinterWidth: '80mm' | '58mm';
