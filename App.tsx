@@ -11,7 +11,8 @@ import {
   UserRound,
   ExternalLink,
   Utensils,
-  Tv
+  Tv,
+  Users
 } from 'lucide-react';
 import { supabase } from './lib/supabase.ts';
 import { Product, Order, StoreSettings, OrderStatus } from './types.ts';
@@ -67,32 +68,32 @@ export default function App() {
         if (oRes.data) setOrders(oRes.data);
         if (sRes.data) setSettings(sRes.data.data);
       } catch (err) {
-        console.error('Erro ao buscar dados:', err);
+        console.error('Erro inicial:', err);
       }
     };
 
     fetchInitialData();
 
-    // CONFIGURAÇÃO REALTIME SUPABASE
     const channel = supabase
-      .channel('db-realtime')
+      .channel('vovo-guta-main')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, (payload) => {
         if (payload.eventType === 'INSERT') {
-          setOrders(prev => [payload.new as Order, ...prev]);
-          playSound(SOUNDS.NEW_ORDER); // Som de novo pedido
+          const newOrder = payload.new as Order;
+          setOrders(prev => [newOrder, ...prev]);
+          playSound(SOUNDS.NEW_ORDER);
         } else if (payload.eventType === 'UPDATE') {
-          const updatedOrder = payload.new as Order;
-          const oldOrder = payload.old as Order;
-          
-          setOrders(prev => prev.map(o => o.id === updatedOrder.id ? updatedOrder : o));
-          
-          // Som de pedido pronto (Se o status mudou para PRONTO agora)
-          if (updatedOrder.status === 'PRONTO' && oldOrder.status !== 'PRONTO') {
+          const updated = payload.new as Order;
+          const old = payload.old as Order;
+          setOrders(prev => prev.map(o => o.id === updated.id ? updated : o));
+          if (updated.status === 'PRONTO' && (old as any).status !== 'PRONTO') {
             playSound(SOUNDS.ORDER_READY);
           }
         } else if (payload.eventType === 'DELETE') {
           setOrders(prev => prev.filter(o => o.id !== payload.old.id));
         }
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, () => {
+        supabase.from('products').select('*').then(({ data }) => data && setProducts(data));
       })
       .subscribe();
 
@@ -112,8 +113,7 @@ export default function App() {
   }, []);
 
   const addOrder = async (order: Order) => {
-    // Tratamento rigoroso para evitar erros de coluna no Supabase
-    const payload: any = {
+    const payload = {
       id: order.id,
       type: order.type || 'BALCAO',
       items: order.items,
@@ -121,17 +121,15 @@ export default function App() {
       status: order.status || 'PREPARANDO',
       createdAt: order.createdAt || Date.now(),
       paymentMethod: order.paymentMethod || 'PIX',
+      tableNumber: order.tableNumber || null,
+      notes: order.notes || null,
+      customerName: order.customerName || null,
+      deliveryAddress: order.deliveryAddress || null,
+      changeFor: order.changeFor || null
     };
 
-    // Só envia estes campos se eles não forem nulos/vazios
-    if (order.tableNumber) payload.tableNumber = order.tableNumber;
-    if (order.notes) payload.notes = order.notes;
-
-    const { error } = await supabase.from('orders').insert(payload);
-    if (error) {
-      console.error("Erro Supabase:", error);
-      throw error;
-    }
+    const { error } = await supabase.from('orders').insert([payload]);
+    if (error) throw error;
   };
 
   const updateOrderStatus = async (id: string, status: OrderStatus) => {
@@ -170,20 +168,35 @@ function AdminLayout({ settings }: { settings: StoreSettings }) {
       <aside className="w-64 bg-[#3d251e] text-white hidden md:flex flex-col border-r border-gray-800">
         <div className="p-6 flex items-center gap-3 border-b border-white/10">
           <img src={settings.logoUrl} alt="Logo" className="w-10 h-10 rounded-full object-cover border-2 border-orange-500" />
-          <span className="font-brand text-lg font-bold">{settings.storeName}</span>
+          <span className="font-brand text-lg font-bold truncate">{settings.storeName}</span>
         </div>
-        <nav className="flex-1 p-4 space-y-1">
-          <Link to="/" className={`flex items-center gap-3 p-3 rounded-xl ${location.pathname === '/' ? 'bg-[#f68c3e]' : 'hover:bg-white/5'}`}><LayoutDashboard size={20} /> Dashboard</Link>
-          <Link to="/pedidos" className={`flex items-center gap-3 p-3 rounded-xl ${location.pathname === '/pedidos' ? 'bg-[#f68c3e]' : 'hover:bg-white/5'}`}><ShoppingCart size={20} /> Pedidos</Link>
-          <Link to="/cardapio-admin" className={`flex items-center gap-3 p-3 rounded-xl ${location.pathname === '/cardapio-admin' ? 'bg-[#f68c3e]' : 'hover:bg-white/5'}`}><PlusCircle size={20} /> Cardápio</Link>
-          <Link to="/configuracoes" className={`flex items-center gap-3 p-3 rounded-xl ${location.pathname === '/configuracoes' ? 'bg-[#f68c3e]' : 'hover:bg-white/5'}`}><Settings size={20} /> Ajustes</Link>
-          <div className="pt-6 pb-2 px-3 text-[10px] text-gray-500 font-bold uppercase">Telas Externas</div>
+        <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
+          <div className="pb-2 px-3 text-[10px] text-gray-500 font-bold uppercase tracking-widest">Gestão</div>
+          <Link to="/" className={`flex items-center gap-3 p-3 rounded-xl transition-all ${location.pathname === '/' ? 'bg-[#f68c3e]' : 'hover:bg-white/5'}`}><LayoutDashboard size={20} /> Dashboard</Link>
+          <Link to="/pedidos" className={`flex items-center gap-3 p-3 rounded-xl transition-all ${location.pathname === '/pedidos' ? 'bg-[#f68c3e]' : 'hover:bg-white/5'}`}><ShoppingCart size={20} /> Pedidos</Link>
+          <Link to="/cardapio-admin" className={`flex items-center gap-3 p-3 rounded-xl transition-all ${location.pathname === '/cardapio-admin' ? 'bg-[#f68c3e]' : 'hover:bg-white/5'}`}><PlusCircle size={20} /> Cardápio</Link>
+          <Link to="/garcom" className={`flex items-center gap-3 p-3 rounded-xl transition-all ${location.pathname === '/garcom' ? 'bg-[#f68c3e]' : 'hover:bg-white/5'}`}><Users size={20} /> Equipe</Link>
+          <Link to="/configuracoes" className={`flex items-center gap-3 p-3 rounded-xl transition-all ${location.pathname === '/configuracoes' ? 'bg-[#f68c3e]' : 'hover:bg-white/5'}`}><Settings size={20} /> Ajustes</Link>
+          
+          <div className="pt-6 pb-2 px-3 text-[10px] text-gray-500 font-bold uppercase tracking-widest">Operação</div>
           <a href="#/cardapio" target="_blank" className="flex items-center justify-between p-3 rounded-xl hover:bg-white/5 text-gray-300 group"><div className="flex items-center gap-3"><Utensils size={20} /> Cardápio</div><ExternalLink size={14} className="opacity-0 group-hover:opacity-100" /></a>
+          <a href="#/garconete" target="_blank" className="flex items-center justify-between p-3 rounded-xl hover:bg-white/5 text-gray-300 group"><div className="flex items-center gap-3"><UserRound size={20} /> Painel Garçom</div><ExternalLink size={14} className="opacity-0 group-hover:opacity-100" /></a>
           <a href="#/tv" target="_blank" className="flex items-center justify-between p-3 rounded-xl hover:bg-white/5 text-gray-300 group"><div className="flex items-center gap-3"><Tv size={20} /> Painel TV</div><ExternalLink size={14} className="opacity-0 group-hover:opacity-100" /></a>
         </nav>
-        <div className="p-4 border-t border-white/10"><button onClick={handleSignOut} className="w-full flex items-center gap-3 p-3 rounded-xl text-red-400 hover:bg-red-500/10 text-sm font-bold"><LogOut size={18} /> Sair</button></div>
+        <div className="p-4 border-t border-white/10"><button onClick={handleSignOut} className="w-full flex items-center gap-3 p-3 rounded-xl text-red-400 hover:bg-red-500/10 text-sm font-bold transition-colors"><LogOut size={18} /> Sair</button></div>
       </aside>
-      <main className="flex-1 overflow-auto"><header className="bg-white h-16 border-b flex items-center justify-between px-8 sticky top-0 z-10"><h1 className="text-xl font-bold text-gray-800">Admin Panel</h1><img src={settings.logoUrl} className="w-10 h-10 rounded-full border" /></header><div className="p-8"><Outlet /></div></main>
+      <main className="flex-1 overflow-auto">
+        <header className="bg-white h-16 border-b flex items-center justify-between px-8 sticky top-0 z-10">
+          <h1 className="text-xl font-bold text-gray-800">Administração</h1>
+          <div className="flex items-center gap-4">
+            <span className="text-xs font-bold text-gray-400 uppercase hidden md:block">Sistema Ativo</span>
+            <img src={settings.logoUrl} className="w-10 h-10 rounded-full border shadow-sm" />
+          </div>
+        </header>
+        <div className="p-8">
+          <Outlet />
+        </div>
+      </main>
     </div>
   );
 }
