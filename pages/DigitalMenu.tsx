@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { ShoppingCart, X, ChevronLeft, Trash2, Plus as PlusIcon, CheckCircle, Loader2, Send, Search, LayoutGrid, RotateCcw, Clock, Star, Flame, Hash, User, Phone, MapPin, Weight } from 'lucide-react';
+import { ShoppingCart, X, ChevronLeft, Trash2, Plus as PlusIcon, CheckCircle, Loader2, Send, Search, LayoutGrid, RotateCcw, Clock, Star, Flame, Hash, User, Phone, MapPin, Weight, Ban } from 'lucide-react';
 import { Product, StoreSettings, Order, OrderItem, OrderType, PaymentMethod } from '../types';
 
 interface Props {
@@ -25,9 +25,8 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
   const [activeCategory, setActiveCategory] = useState('Todos');
   const [searchTerm, setSearchTerm] = useState('');
   
-  // Estado para o seletor de peso (KG)
   const [weightProduct, setWeightProduct] = useState<Product | null>(null);
-  const [selectedWeight, setSelectedWeight] = useState<number>(100); // gramas
+  const [selectedWeight, setSelectedWeight] = useState<number>(100);
 
   const effectiveTable = initialTable || urlTable || null;
   const [orderType, setOrderType] = useState<OrderType>(effectiveTable ? 'MESA' : 'BALCAO');
@@ -42,9 +41,10 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
 
   const isStoreOpen = useMemo(() => settings.isDeliveryActive || settings.isTableOrderActive || settings.isCounterPickupActive, [settings]);
 
+  // OFERTA DO DIA: Só exibe se o produto estiver ATIVO no estoque
   const todayOffer = useMemo(() => {
     const today = new Date().getDay();
-    return products.find(p => p.featuredDay === today);
+    return products.find(p => p.featuredDay === today && p.isActive);
   }, [products]);
 
   const categories = useMemo(() => ['Todos', ...externalCategories], [externalCategories]);
@@ -198,16 +198,22 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {filteredProducts.map(product => (
-            <div key={product.id} className="bg-white rounded-[2rem] p-4 shadow-sm flex gap-4 items-center border border-gray-50">
+            <div key={product.id} className={`bg-white rounded-[2rem] p-4 shadow-sm flex gap-4 items-center border border-gray-50 transition-all ${!product.isActive ? 'opacity-50 grayscale' : ''}`}>
               <img src={product.imageUrl} className="w-20 h-20 object-cover rounded-2xl" />
               <div className="flex-1">
                 <h3 className="font-bold text-sm">{product.name}</h3>
                 <p className="text-[10px] text-gray-400 line-clamp-1">{product.description}</p>
                 <div className="flex items-center justify-between mt-3">
                   <span className="font-bold text-orange-600">R$ {product.price.toFixed(2)} {product.isByWeight ? '/ KG' : ''}</span>
-                  <button onClick={() => handleAddToCart(product)} className={`w-9 h-9 rounded-xl text-white flex items-center justify-center shadow-lg ${isWaitstaff ? 'bg-[#f68c3e]' : 'bg-[#3d251e]'}`}>
-                    <PlusIcon size={20} />
-                  </button>
+                  {product.isActive ? (
+                    <button onClick={() => handleAddToCart(product)} className={`w-9 h-9 rounded-xl text-white flex items-center justify-center shadow-lg ${isWaitstaff ? 'bg-[#f68c3e]' : 'bg-[#3d251e]'}`}>
+                      <PlusIcon size={20} />
+                    </button>
+                  ) : (
+                    <span className="text-[9px] font-black text-red-500 bg-red-50 px-2 py-1 rounded-lg flex items-center gap-1">
+                        <Ban size={10} /> ESGOTADO
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
@@ -251,6 +257,7 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
         </div>
       )}
 
+      {/* Cart e Checkout (omitidos para brevidade, sem alteração lógica aqui) */}
       {isCartOpen && (
         <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-end sm:items-center justify-center p-4">
           <div className="bg-white w-full max-w-lg rounded-t-[3rem] sm:rounded-[3rem] overflow-hidden flex flex-col max-h-[90vh] shadow-2xl">

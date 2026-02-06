@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { Product } from '../types';
-import { Plus, Search, Edit2, Trash2, Camera, Star, CheckCircle, XCircle, Tag, X, AlignLeft, Loader2, Weight } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, Camera, Star, CheckCircle, XCircle, Tag, X, AlignLeft, Loader2, Weight, Power } from 'lucide-react';
 import { Switch } from '../components/Switch';
 
 interface Props {
@@ -60,17 +60,6 @@ const MenuManagement: React.FC<Props> = ({ products, saveProduct, deleteProduct,
     }
   };
 
-  const handleAddCategory = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newCategoryName.trim()) return;
-    if (categories.includes(newCategoryName.trim())) {
-        alert("Esta categoria já existe.");
-        return;
-    }
-    setCategories([...categories, newCategoryName.trim()]);
-    setNewCategoryName('');
-  };
-
   const days = [
     { id: 0, name: "Domingo" }, { id: 1, name: "Segunda" }, { id: 2, name: "Terça" },
     { id: 3, name: "Quarta" }, { id: 4, name: "Quinta" }, { id: 5, name: "Sexta" }, { id: 6, name: "Sábado" }
@@ -107,7 +96,7 @@ const MenuManagement: React.FC<Props> = ({ products, saveProduct, deleteProduct,
 
       <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
         {filtered.map(product => (
-          <div key={product.id} className={`bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100 group relative ${!product.isActive ? 'opacity-60 grayscale' : ''}`}>
+          <div key={product.id} className={`bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100 group relative ${!product.isActive ? 'opacity-50 grayscale' : ''}`}>
             <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
               <button onClick={() => { setEditingProduct(product); setShowProductModal(true); }} className="p-2 bg-white rounded-lg shadow text-blue-500 hover:bg-blue-50">
                 <Edit2 size={16} />
@@ -117,18 +106,27 @@ const MenuManagement: React.FC<Props> = ({ products, saveProduct, deleteProduct,
               </button>
             </div>
 
+            {!product.isActive && (
+                <div className="absolute inset-0 bg-white/40 flex items-center justify-center z-10 pointer-events-none">
+                    <span className="bg-red-600 text-white text-[10px] font-black px-4 py-1 rounded-full shadow-lg rotate-12">FORA DE ESTOQUE</span>
+                </div>
+            )}
+
             {product.isByWeight && (
                 <div className="absolute top-2 left-2 z-10 bg-blue-500 text-white text-[9px] font-black px-2 py-1 rounded shadow-md flex items-center gap-1">
-                    <Weight size={10} /> VENDA POR KG
+                    <Weight size={10} /> KG
                 </div>
             )}
             
             <img src={product.imageUrl} className="w-full h-40 object-cover" alt={product.name} />
             
             <div className="p-4">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-orange-600 bg-orange-50 px-2 py-1 rounded">
-                {product.category}
-              </span>
+              <div className="flex justify-between items-start">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-orange-600 bg-orange-50 px-2 py-1 rounded">
+                    {product.category}
+                  </span>
+                  {product.featuredDay !== undefined && <Star size={14} className="text-yellow-500 fill-current" />}
+              </div>
               <h3 className="font-bold text-gray-800 mt-2">{product.name}</h3>
               <p className="text-xs text-gray-400 line-clamp-1 mb-1">{product.description}</p>
               <p className="text-sm font-bold text-[#3d251e] mt-1">R$ {product.price.toFixed(2)} {product.isByWeight ? '/ KG' : ''}</p>
@@ -145,6 +143,24 @@ const MenuManagement: React.FC<Props> = ({ products, saveProduct, deleteProduct,
               <button onClick={() => setShowProductModal(false)} className="text-gray-400"><X /></button>
             </div>
             <form onSubmit={handleSaveProduct} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto custom-scrollbar">
+              
+              {/* Opção de Ativar/Desativar no Estoque */}
+              <div className="bg-orange-50 p-4 rounded-2xl flex items-center justify-between border border-orange-100">
+                  <div className="flex items-center gap-3">
+                      <div className={`p-2 rounded-xl ${editingProduct?.isActive ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-400'}`}>
+                        <Power size={20} />
+                      </div>
+                      <div>
+                          <p className="text-sm font-bold text-gray-800">Status no Cardápio</p>
+                          <p className="text-[10px] text-gray-500">Produto disponível para os clientes?</p>
+                      </div>
+                  </div>
+                  <Switch 
+                    checked={editingProduct?.isActive ?? true} 
+                    onChange={(v) => setEditingProduct({...editingProduct, isActive: v})} 
+                  />
+              </div>
+
               <div className="flex gap-4 items-center">
                 <div className="w-24 h-24 bg-gray-100 rounded-xl flex flex-col items-center justify-center text-gray-400 border-2 border-dashed border-gray-200 cursor-pointer overflow-hidden relative">
                   {editingProduct?.imageUrl ? (
