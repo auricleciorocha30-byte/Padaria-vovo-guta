@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Order, Product } from '../types';
-import { TrendingUp, Users, ShoppingBag, DollarSign, Calendar } from 'lucide-react';
+import { TrendingUp, Users, ShoppingBag, DollarSign, Calendar, XCircle } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
 interface Props {
@@ -10,8 +10,13 @@ interface Props {
 }
 
 const AdminDashboard: React.FC<Props> = ({ orders, products }) => {
-  const totalSales = orders.reduce((acc, o) => acc + o.total, 0);
-  const totalOrders = orders.length;
+  // Cálculo das métricas baseadas nos pedidos reais
+  const totalSales = orders
+    .filter(o => o.status !== 'CANCELADO')
+    .reduce((acc, o) => acc + o.total, 0);
+    
+  const totalOrders = orders.filter(o => o.status !== 'CANCELADO').length;
+  const canceledOrdersCount = orders.filter(o => o.status === 'CANCELADO').length;
   
   const data = [
     { name: 'Seg', sales: 400 },
@@ -25,12 +30,38 @@ const AdminDashboard: React.FC<Props> = ({ orders, products }) => {
 
   return (
     <div className="space-y-8">
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard title="Total em Vendas" value={`R$ ${totalSales.toFixed(2)}`} icon={<DollarSign className="text-green-600" />} color="bg-green-50" />
-        <StatCard title="Pedidos Hoje" value={totalOrders.toString()} icon={<ShoppingBag className="text-orange-600" />} color="bg-orange-50" />
-        <StatCard title="Novos Clientes" value="12" icon={<Users className="text-blue-600" />} color="bg-blue-50" />
-        <StatCard title="Crescimento" value="+15.3%" icon={<TrendingUp className="text-purple-600" />} color="bg-purple-50" />
+      {/* Stats Grid - Ajustado para 5 colunas em telas grandes */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
+        <StatCard 
+          title="Total em Vendas" 
+          value={`R$ ${totalSales.toFixed(2)}`} 
+          icon={<DollarSign className="text-green-600" />} 
+          color="bg-green-50" 
+        />
+        <StatCard 
+          title="Pedidos Concluídos" 
+          value={totalOrders.toString()} 
+          icon={<ShoppingBag className="text-orange-600" />} 
+          color="bg-orange-50" 
+        />
+        <StatCard 
+          title="Cancelados" 
+          value={canceledOrdersCount.toString()} 
+          icon={<XCircle className="text-red-600" />} 
+          color="bg-red-50" 
+        />
+        <StatCard 
+          title="Novos Clientes" 
+          value="12" 
+          icon={<Users className="text-blue-600" />} 
+          color="bg-blue-50" 
+        />
+        <StatCard 
+          title="Crescimento" 
+          value="+15.3%" 
+          icon={<TrendingUp className="text-purple-600" />} 
+          color="bg-purple-50" 
+        />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -85,12 +116,12 @@ const AdminDashboard: React.FC<Props> = ({ orders, products }) => {
 
 const StatCard = ({ title, value, icon, color }: { title: string, value: string, icon: React.ReactNode, color: string }) => (
   <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex items-center gap-4">
-    <div className={`w-14 h-14 rounded-2xl ${color} flex items-center justify-center`}>
+    <div className={`w-14 h-14 rounded-2xl ${color} flex items-center justify-center shrink-0`}>
       {icon}
     </div>
-    <div>
-      <p className="text-xs text-gray-400 font-medium">{title}</p>
-      <p className="text-2xl font-bold text-gray-900">{value}</p>
+    <div className="min-w-0">
+      <p className="text-[10px] text-gray-400 font-bold uppercase tracking-tight truncate">{title}</p>
+      <p className="text-xl font-bold text-gray-900 truncate">{value}</p>
     </div>
   </div>
 );
