@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo } from 'react';
-import { ShoppingCart, Clock, X, ChevronLeft, Trash2, Plus as PlusIcon, MapPin, CreditCard, Banknote, QrCode, Utensils, ShoppingBag, Truck, MessageSquare, Loader2 } from 'lucide-react';
+import { ShoppingCart, Clock, X, ChevronLeft, Trash2, Plus as PlusIcon, MapPin, CreditCard, Banknote, QrCode, Utensils, ShoppingBag, Truck, MessageSquare, Loader2, Send } from 'lucide-react';
 import { Product, StoreSettings, Order, OrderItem, OrderType, PaymentMethod } from '../types';
 
 interface Props {
@@ -51,37 +51,34 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
   const handleCheckout = async () => {
     if (cart.length === 0) return;
     if (orderType === 'MESA' && !manualTable) { alert('Informe o número da mesa'); return; }
-    if (orderType === 'ENTREGA' && !address) { alert('Informe o endereço de entrega'); return; }
     
     setIsSending(true);
     
-    // Construção robusta do pedido
+    // Construção do pedido
     const newOrder: any = {
       id: Math.random().toString(36).substr(2, 9),
-      type: orderType,
+      type: isWaitstaff ? 'MESA' : orderType,
       items: cart,
       status: 'PREPARANDO',
       total: cartTotal,
       createdAt: new Date().toISOString(),
-      paymentMethod: payment
+      paymentMethod: isWaitstaff ? 'DINHEIRO' : payment // Garçom lança e paga no final
     };
 
-    // Adiciona campos apenas se existirem valores para evitar erros de banco de dados
-    if (orderType === 'MESA') newOrder.tableNumber = manualTable;
-    if (orderType === 'ENTREGA') newOrder.deliveryAddress = address;
+    if (tableNumber || manualTable) newOrder.tableNumber = tableNumber || manualTable;
+    if (!isWaitstaff && orderType === 'ENTREGA') newOrder.deliveryAddress = address;
     if (notes.trim()) newOrder.notes = notes;
-    if (payment === 'DINHEIRO' && changeFor) newOrder.changeFor = parseFloat(changeFor);
+    if (!isWaitstaff && payment === 'DINHEIRO' && changeFor) newOrder.changeFor = parseFloat(changeFor);
 
     try {
         await addOrder(newOrder);
         setCart([]);
         setIsCartOpen(false);
         setCheckoutStep('cart');
-        alert('✅ Pedido enviado com sucesso! Aguarde o preparo.');
+        alert('✅ Pedido enviado para a cozinha!');
+        if (isWaitstaff) onLogout(); // Volta para o mapa de mesas
     } catch (err: any) {
-        console.error("Erro detalhado:", err);
-        const errorMsg = err.message || "Verifique sua conexão";
-        alert(`❌ Erro ao enviar pedido: ${errorMsg}\n\nDica: Verifique se as permissões de acesso (RLS) estão configuradas no seu banco de dados.`);
+        alert(`❌ Erro: ${err.message || "Falha na conexão"}`);
     } finally {
         setIsSending(false);
     }
@@ -93,8 +90,12 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
         <div className="max-w-4xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-4">
             <button onClick={onLogout} className="p-2 hover:bg-white/10 rounded-full transition-colors"><ChevronLeft size={24} /></button>
-            <img src={settings.logoUrl} className="w-10 h-10 rounded-full object-cover border-2 border-white/20" alt="Logo" />
-            <h1 className="font-brand text-lg font-bold">{settings.storeName}</h1>
+            <div className="flex flex-col">
+                <h1 className="font-brand text-lg font-bold leading-none">{isWaitstaff ? 'Modo Garçom' : settings.storeName}</h1>
+                <span className="text-[10px] opacity-70 uppercase tracking-widest mt-1">
+                    {tableNumber ? `Atendendo Mesa ${tableNumber}` : 'Autoatendimento'}
+                </span>
+            </div>
           </div>
           <button onClick={() => { setIsCartOpen(true); setCheckoutStep('cart'); }} className="relative p-2 bg-white/10 rounded-full">
             <ShoppingCart size={24} />
@@ -119,14 +120,13 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {filteredProducts.map(product => (
             <div key={product.id} className="bg-white rounded-[2rem] p-4 shadow-sm border border-gray-100 flex gap-4 items-center">
-              <img src={product.imageUrl} className="w-24 h-24 object-cover rounded-2xl" alt={product.name} />
+              <img src={product.imageUrl} className="w-20 h-20 object-cover rounded-2xl" alt={product.name} />
               <div className="flex-1">
                 <h3 className="font-bold text-sm">{product.name}</h3>
-                <p className="text-[10px] text-gray-400 line-clamp-2 mt-1">{product.description}</p>
                 <div className="flex items-center justify-between mt-3">
-                  <span className="font-bold text-orange-600">R$ {product.price.toFixed(2)}</span>
-                  <button onClick={() => addToCart(product)} className="w-8 h-8 rounded-xl bg-[#3d251e] text-white flex items-center justify-center hover:scale-105 active:scale-95 transition-all">
-                    <PlusIcon size={18} />
+                  <span className="font-bold text-orange-600 text-lg">R$ {product.price.toFixed(2)}</span>
+                  <button onClick={() => addToCart(product)} className={`w-10 h-10 rounded-xl text-white flex items-center justify-center hover:scale-110 active:scale-95 transition-all shadow-md ${isWaitstaff ? 'bg-[#f68c3e]' : 'bg-[#3d251e]'}`}>
+                    <PlusIcon size={20} />
                   </button>
                 </div>
               </div>
@@ -135,29 +135,47 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
         </div>
       </main>
 
+      {/* Footer Fixo do Carrinho (Estilo Mobile App) */}
+      {cart.length > 0 && (
+          <div className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[90%] max-w-lg z-30">
+              <button 
+                onClick={() => { setIsCartOpen(true); setCheckoutStep('cart'); }}
+                className={`w-full py-4 rounded-[2rem] shadow-2xl flex items-center justify-between px-8 text-white animate-slide-up ${isWaitstaff ? 'bg-[#f68c3e]' : 'bg-[#3d251e]'}`}
+              >
+                  <div className="flex items-center gap-3">
+                      <div className="bg-white/20 p-2 rounded-lg"><ShoppingCart size={20}/></div>
+                      <span className="font-bold">{cart.reduce((a,b) => a+b.quantity, 0)} itens</span>
+                  </div>
+                  <span className="font-brand text-xl font-bold">R$ {cartTotal.toFixed(2)}</span>
+              </button>
+          </div>
+      )}
+
+      {/* Modal de Finalização */}
       {isCartOpen && (
         <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-end sm:items-center justify-center p-4">
           <div className="bg-white w-full max-w-lg rounded-t-[3rem] sm:rounded-[3rem] overflow-hidden flex flex-col max-h-[90vh] shadow-2xl animate-slide-up">
             <div className="p-8 border-b flex items-center justify-between">
               <h2 className="font-bold text-xl">
-                {checkoutStep === 'cart' ? 'Carrinho' : checkoutStep === 'details' ? 'Entrega/Mesa' : 'Pagamento'}
+                {checkoutStep === 'cart' ? 'Conferir Pedido' : 'Finalização'}
               </h2>
               <button onClick={() => setIsCartOpen(false)} className="p-2 text-gray-400 hover:bg-gray-100 rounded-full"><X size={24} /></button>
             </div>
 
             <div className="flex-1 overflow-auto p-8 space-y-6">
               {checkoutStep === 'cart' && (
-                <div className="space-y-3">
-                  {cart.length === 0 ? <p className="text-center text-gray-400 py-10">Carrinho Vazio</p> : cart.map(item => (
-                    <div key={item.productId} className="flex justify-between items-center bg-gray-50 p-4 rounded-2xl">
+                <div className="space-y-4">
+                  {cart.map(item => (
+                    <div key={item.productId} className="flex justify-between items-center bg-gray-50 p-4 rounded-2xl border border-gray-100">
                       <div><p className="font-bold text-sm">{item.name}</p><p className="text-xs text-gray-400">{item.quantity}x R$ {item.price.toFixed(2)}</p></div>
-                      <button onClick={() => removeFromCart(item.productId)} className="text-red-300 hover:text-red-500"><Trash2 size={18} /></button>
+                      <button onClick={() => removeFromCart(item.productId)} className="text-red-300 hover:text-red-500 transition-colors"><Trash2 size={18} /></button>
                     </div>
                   ))}
+                  <textarea placeholder="Alguma observação? (ex: sem gelo)" value={notes} onChange={e => setNotes(e.target.value)} className="w-full p-4 bg-gray-50 border rounded-2xl outline-none focus:border-orange-500 min-h-[80px]" />
                 </div>
               )}
 
-              {checkoutStep === 'details' && (
+              {checkoutStep === 'details' && !isWaitstaff && (
                 <div className="space-y-6">
                   <div className="grid grid-cols-3 gap-2">
                     {[
@@ -170,31 +188,29 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
                         </button>
                     ))}
                   </div>
-                  {orderType === 'MESA' && <input type="text" placeholder="Número da Mesa" value={manualTable} onChange={e => setManualTable(e.target.value)} className="w-full p-4 bg-gray-50 border rounded-2xl outline-none focus:border-orange-500" />}
-                  {orderType === 'ENTREGA' && <textarea placeholder="Endereço Completo" value={address} onChange={e => setAddress(e.target.value)} className="w-full p-4 bg-gray-50 border rounded-2xl outline-none focus:border-orange-500 min-h-[80px]" />}
-                  <textarea placeholder="Observações (opcional)" value={notes} onChange={e => setNotes(e.target.value)} className="w-full p-4 bg-gray-50 border rounded-2xl outline-none focus:border-orange-500 min-h-[60px]" />
+                  {orderType === 'MESA' && !tableNumber && <input type="text" placeholder="Número da Mesa" value={manualTable} onChange={e => setManualTable(e.target.value)} className="w-full p-4 bg-gray-50 border rounded-2xl outline-none focus:border-orange-500" />}
+                  {orderType === 'ENTREGA' && <textarea placeholder="Endereço de Entrega" value={address} onChange={e => setAddress(e.target.value)} className="w-full p-4 bg-gray-50 border rounded-2xl outline-none focus:border-orange-500 min-h-[80px]" />}
                 </div>
               )}
 
-              {checkoutStep === 'payment' && (
+              {checkoutStep === 'payment' && !isWaitstaff && (
                 <div className="space-y-4">
                   {[
                       {id: 'PIX', label: 'Pix Instantâneo', icon: <QrCode size={20}/>},
-                      {id: 'CARTAO', label: 'Cartão (Mesa/Entrega)', icon: <CreditCard size={20}/>},
+                      {id: 'CARTAO', label: 'Cartão', icon: <CreditCard size={20}/>},
                       {id: 'DINHEIRO', label: 'Dinheiro', icon: <Banknote size={20}/>}
                   ].map(p => (
                       <button key={p.id} onClick={() => setPayment(p.id as any)} className={`w-full p-5 rounded-2xl border-2 flex items-center gap-4 transition-all ${payment === p.id ? 'border-[#f68c3e] bg-orange-50 text-[#f68c3e]' : 'border-gray-50 text-gray-500'}`}>
                           {p.icon} <span className="font-bold">{p.label}</span>
                       </button>
                   ))}
-                  {payment === 'DINHEIRO' && <input type="number" placeholder="Troco para quanto?" value={changeFor} onChange={e => setChangeFor(e.target.value)} className="w-full p-4 bg-gray-50 border rounded-2xl outline-none" />}
                 </div>
               )}
             </div>
 
             <div className="p-8 bg-gray-50 border-t flex flex-col gap-4">
               <div className="flex justify-between items-end">
-                <span className="text-gray-400 text-xs font-bold uppercase tracking-widest">Subtotal</span>
+                <span className="text-gray-400 text-xs font-bold uppercase tracking-widest">Total</span>
                 <span className="text-3xl font-brand font-bold">R$ {cartTotal.toFixed(2)}</span>
               </div>
               <div className="flex gap-2">
@@ -202,13 +218,13 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
                   <button 
                     disabled={cart.length === 0 || isSending}
                     onClick={() => {
-                        if (checkoutStep === 'cart') setCheckoutStep('details');
-                        else if (checkoutStep === 'details') setCheckoutStep('payment');
-                        else handleCheckout();
+                        if (isWaitstaff || checkoutStep === 'payment') handleCheckout();
+                        else if (checkoutStep === 'cart') setCheckoutStep('details');
+                        else setCheckoutStep('payment');
                     }}
                     className={`flex-1 py-4 rounded-2xl font-bold text-white shadow-xl flex items-center justify-center gap-2 ${isWaitstaff ? 'bg-[#f68c3e]' : 'bg-[#3d251e]'} disabled:opacity-50`}
                   >
-                    {isSending ? <Loader2 className="animate-spin"/> : checkoutStep === 'payment' ? 'Enviar Pedido' : 'Próximo'}
+                    {isSending ? <Loader2 className="animate-spin"/> : (isWaitstaff || checkoutStep === 'payment') ? <><Send size={18}/> Enviar Pedido</> : 'Próximo'}
                   </button>
               </div>
             </div>

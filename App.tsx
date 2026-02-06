@@ -9,7 +9,8 @@ import {
   LogOut,
   CalendarDays,
   Loader2,
-  ShieldCheck
+  ShieldCheck,
+  UserRound
 } from 'lucide-react';
 import { supabase } from './lib/supabase.ts';
 import { Product, Order, StoreSettings, OrderStatus } from './types.ts';
@@ -107,10 +108,9 @@ export default function App() {
   }, []);
 
   const addOrder = async (order: Order) => {
-    // Garantir que a data está em um formato que o Supabase aceita bem
     const orderToInsert = {
         ...order,
-        createdAt: new Date().toISOString() // Mudando para ISOString para evitar erros de tipo numeric no SQL
+        createdAt: new Date().toISOString()
     };
 
     const { error } = await supabase.from('orders').insert(orderToInsert);
@@ -119,7 +119,6 @@ export default function App() {
       throw error;
     }
     
-    // Atualiza o estado local imediatamente para feedback instantâneo
     setOrders(prev => [orderToInsert as any, ...prev]);
   };
 
@@ -129,7 +128,6 @@ export default function App() {
       console.error('Error updating order status:', error);
       throw error;
     }
-    // O realtime cuidará de atualizar a lista, mas podemos atualizar aqui também
     setOrders(prev => prev.map(o => o.id === id ? { ...o, status } : o));
   };
 
@@ -171,7 +169,7 @@ export default function App() {
         </Route>
 
         <Route path="/mesa/login" element={<TableLogin onLogin={(t) => { setActiveTable(t); setIsWaitstaff(false); }} />} />
-        <Route path="/garconete" element={<WaitressPanel onSelectTable={(t) => { setActiveTable(t); setIsWaitstaff(true); }} />} />
+        <Route path="/garconete" element={<WaitressPanel orders={orders} onSelectTable={(t) => { setActiveTable(t); setIsWaitstaff(true); }} />} />
         <Route path="/cardapio" element={<DigitalMenu products={products} categories={categories} settings={settings} orders={orders} addOrder={addOrder} tableNumber={activeTable} onLogout={() => { setActiveTable(null); setIsWaitstaff(false); }} isWaitstaff={isWaitstaff} />} />
         <Route path="/tv" element={<TVBoard orders={orders} settings={settings} products={products} />} />
       </Routes>
@@ -203,6 +201,12 @@ function AdminLayout({ settings }: { settings: StoreSettings }) {
               {item.icon} <span className="font-medium">{item.label}</span>
             </Link>
           ))}
+          <div className="pt-4 pb-2 px-3">
+              <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Equipe</p>
+          </div>
+          <Link to="/garconete" className="flex items-center gap-3 p-3 rounded-xl hover:bg-white/5 text-gray-400 hover:text-white">
+            <UserRound size={20} /> <span className="font-medium">Painel Garçom</span>
+          </Link>
         </nav>
         <div className="p-4 border-t border-white/10 space-y-2">
           <Link to="/garcom" className="flex items-center gap-3 p-3 rounded-xl hover:bg-white/5 text-gray-400 text-sm"><ShieldCheck size={18} /> Permissões</Link>
