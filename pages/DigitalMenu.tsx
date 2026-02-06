@@ -137,7 +137,7 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
       <header className={`sticky top-0 z-20 shadow-lg transition-colors ${isWaitstaff ? 'bg-[#f68c3e]' : 'bg-[#3d251e]'} text-white p-6`}>
         <div className="max-w-4xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <button onClick={onLogout} className="p-2 hover:bg-white/10 rounded-full transition-colors mr-1">
+            <button onClick={onLogout} title="Sair" className="p-2 hover:bg-white/10 rounded-full transition-colors mr-1">
                 <ChevronLeft size={24} />
             </button>
             <img src={settings.logoUrl} alt="Logo" className="w-12 h-12 rounded-full border-2 border-white/20" />
@@ -164,7 +164,7 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
         </div>
       </header>
 
-      <main className="max-w-4xl mx-auto px-4 py-8 space-y-8 pb-24">
+      <main className="max-w-4xl mx-auto px-4 py-8 space-y-8 pb-12">
         
         {/* Waitstaff Summary Section */}
         {isWaitstaff && tableOrders.length > 0 && (
@@ -350,41 +350,6 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
           </div>
         </div>
       )}
-
-      <footer className="bg-white border-t border-gray-100 p-4 flex justify-around items-center sticky bottom-0 z-20 shadow-[0_-10px_30px_rgba(0,0,0,0.03)]">
-         <button className="flex flex-col items-center gap-1 group">
-            <div className="p-2.5 rounded-2xl bg-gray-50 group-hover:bg-orange-50 text-gray-400 group-hover:text-[#f68c3e] transition-all">
-              <Ticket size={24} />
-            </div>
-            <p className="text-[10px] font-bold text-gray-400 group-hover:text-[#3d251e]">Cupons</p>
-         </button>
-         
-         {isWaitstaff && settings.canWaitstaffFinishOrder ? (
-            <button 
-                onClick={handleFinishTable}
-                className="flex flex-col items-center gap-1 group"
-            >
-                <div className="p-4 rounded-full bg-green-500 text-white shadow-lg shadow-green-500/20 -mt-8 border-4 border-white transition-all hover:scale-110 active:scale-90">
-                    <CheckCircle2 size={32} />
-                </div>
-                <p className="text-[10px] font-bold text-green-600">Fechar Mesa</p>
-            </button>
-         ) : (
-            <button className="flex flex-col items-center gap-1 group">
-                <div className="p-2.5 rounded-2xl bg-gray-50 group-hover:bg-orange-50 text-gray-400 group-hover:text-[#f68c3e] transition-all">
-                <MapPin size={24} />
-                </div>
-                <p className="text-[10px] font-bold text-gray-400 group-hover:text-[#3d251e]">Localizar</p>
-            </button>
-         )}
-
-         <button onClick={onLogout} className="flex flex-col items-center gap-1 group">
-            <div className="p-2.5 rounded-2xl bg-red-50 group-hover:bg-red-500 text-red-400 group-hover:text-white transition-all">
-              <LogOut size={24} />
-            </div>
-            <p className="text-[10px] font-bold text-gray-400 group-hover:text-red-500">Sair</p>
-         </button>
-      </footer>
     </div>
   );
 };
