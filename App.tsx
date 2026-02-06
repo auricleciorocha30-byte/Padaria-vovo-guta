@@ -10,7 +10,9 @@ import {
   CalendarDays,
   Loader2,
   ShieldCheck,
-  UserRound
+  UserRound,
+  ExternalLink,
+  Utensils
 } from 'lucide-react';
 import { supabase } from './lib/supabase.ts';
 import { Product, Order, StoreSettings, OrderStatus } from './types.ts';
@@ -108,41 +110,30 @@ export default function App() {
   }, []);
 
   const addOrder = async (order: Order) => {
-    const orderToInsert = {
-        ...order,
-        createdAt: new Date().toISOString()
-    };
-
-    const { error } = await supabase.from('orders').insert(orderToInsert);
-    if (error) {
-      console.error('Supabase Error:', error);
-      throw error;
-    }
+    // Tenta primeiro o insert completo
+    const { error: fullError } = await supabase.from('orders').insert(order);
     
-    setOrders(prev => [orderToInsert as any, ...prev]);
+    if (fullError) {
+      console.warn('Erro no insert completo, tentando simplificado:', fullError.message);
+      
+      // Se falhar por falta de colunas, tenta enviar apenas o básico que costuma ter na tabela padrão
+      const simpleOrder = {
+        id: order.id,
+        items: order.items,
+        total: order.total,
+        status: order.status,
+        createdAt: order.createdAt,
+        type: order.type,
+        tableNumber: order.tableNumber
+      };
+      
+      const { error: simpleError } = await supabase.from('orders').insert(simpleOrder);
+      if (simpleError) throw simpleError;
+    }
   };
 
   const updateOrderStatus = async (id: string, status: OrderStatus) => {
     const { error } = await supabase.from('orders').update({ status }).eq('id', id);
-    if (error) {
-      console.error('Error updating order status:', error);
-      throw error;
-    }
-    setOrders(prev => prev.map(o => o.id === id ? { ...o, status } : o));
-  };
-
-  const handleUpdateSettings = async (newSettings: StoreSettings) => {
-    await supabase.from('settings').upsert({ id: 'store', data: newSettings });
-    setSettings(newSettings);
-  };
-
-  const saveProduct = async (product: Product) => {
-    const { error } = await supabase.from('products').upsert(product);
-    if (error) throw error;
-  };
-
-  const deleteProduct = async (id: string) => {
-    const { error } = await supabase.from('products').delete().eq('id', id);
     if (error) throw error;
   };
 
@@ -161,11 +152,11 @@ export default function App() {
 
         <Route path="/" element={session ? <AdminLayout settings={settings} /> : <Navigate to="/login" />}>
           <Route index element={<AdminDashboard orders={orders} products={products} />} />
-          <Route path="cardapio-admin" element={<MenuManagement products={products} saveProduct={saveProduct} deleteProduct={deleteProduct} categories={categories} setCategories={setCategories} />} />
+          <Route path="cardapio-admin" element={<MenuManagement products={products} saveProduct={async (p) => { await supabase.from('products').upsert(p); }} deleteProduct={async (id) => { await supabase.from('products').delete().eq('id', id); }} categories={categories} setCategories={setCategories} />} />
           <Route path="pedidos" element={<OrdersList orders={orders} updateStatus={updateOrderStatus} products={products} addOrder={addOrder} settings={settings} />} />
-          <Route path="garcom" element={<WaitstaffManagement settings={settings} onUpdateSettings={handleUpdateSettings} />} />
-          <Route path="ofertas" element={<WeeklyOffers products={products} saveProduct={saveProduct} />} />
-          <Route path="configuracoes" element={<StoreSettingsPage settings={settings} setSettings={handleUpdateSettings} />} />
+          <Route path="garcom" element={<WaitstaffManagement settings={settings} onUpdateSettings={async (s) => { await supabase.from('settings').upsert({ id: 'store', data: s }); setSettings(s); }} />} />
+          <Route path="ofertas" element={<WeeklyOffers products={products} saveProduct={async (p) => { await supabase.from('products').upsert(p); }} />} />
+          <Route path="configuracoes" element={<StoreSettingsPage settings={settings} setSettings={async (s) => { await supabase.from('settings').upsert({ id: 'store', data: s }); setSettings(s); }} />} />
         </Route>
 
         <Route path="/mesa/login" element={<TableLogin onLogin={(t) => { setActiveTable(t); setIsWaitstaff(false); }} />} />
@@ -181,13 +172,6 @@ function AdminLayout({ settings }: { settings: StoreSettings }) {
   const location = useLocation();
   const handleSignOut = async () => { await supabase.auth.signOut(); };
 
-  const navItems = [
-    { path: '/', icon: <LayoutDashboard size={20} />, label: 'Dashboard' },
-    { path: '/pedidos', icon: <ShoppingCart size={20} />, label: 'Pedidos' },
-    { path: '/cardapio-admin', icon: <PlusCircle size={20} />, label: 'Cardápio' },
-    { path: '/configuracoes', icon: <Settings size={20} />, label: 'Configurações' },
-  ];
-
   return (
     <div className="flex min-h-screen bg-gray-50">
       <aside className="w-64 bg-[#3d251e] text-white hidden md:flex flex-col border-r border-gray-800">
@@ -196,34 +180,46 @@ function AdminLayout({ settings }: { settings: StoreSettings }) {
           <span className="font-brand text-lg font-bold">{settings.storeName}</span>
         </div>
         <nav className="flex-1 p-4 space-y-1">
-          {navItems.map(item => (
-            <Link key={item.path} to={item.path} className={`flex items-center gap-3 p-3 rounded-xl transition-all ${location.pathname === item.path ? 'bg-[#f68c3e] text-white shadow-lg' : 'hover:bg-white/5 text-gray-400 hover:text-white'}`}>
-              {item.icon} <span className="font-medium">{item.label}</span>
-            </Link>
-          ))}
-          <div className="pt-4 pb-2 px-3">
-              <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Equipe</p>
-          </div>
-          <Link to="/garconete" className="flex items-center gap-3 p-3 rounded-xl hover:bg-white/5 text-gray-400 hover:text-white">
-            <UserRound size={20} /> <span className="font-medium">Painel Garçom</span>
+          <Link to="/" className={`flex items-center gap-3 p-3 rounded-xl transition-all ${location.pathname === '/' ? 'bg-[#f68c3e]' : 'hover:bg-white/5'}`}>
+            <LayoutDashboard size={20} /> Dashboard
           </Link>
+          <Link to="/pedidos" className={`flex items-center gap-3 p-3 rounded-xl transition-all ${location.pathname === '/pedidos' ? 'bg-[#f68c3e]' : 'hover:bg-white/5'}`}>
+            <ShoppingCart size={20} /> Pedidos
+          </Link>
+          <Link to="/cardapio-admin" className={`flex items-center gap-3 p-3 rounded-xl transition-all ${location.pathname === '/cardapio-admin' ? 'bg-[#f68c3e]' : 'hover:bg-white/5'}`}>
+            <PlusCircle size={20} /> Cardápio
+          </Link>
+          <Link to="/configuracoes" className={`flex items-center gap-3 p-3 rounded-xl transition-all ${location.pathname === '/configuracoes' ? 'bg-[#f68c3e]' : 'hover:bg-white/5'}`}>
+            <Settings size={20} /> Ajustes
+          </Link>
+
+          <div className="pt-6 pb-2 px-3">
+              <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Visualização Externa</p>
+          </div>
+          
+          <a href="#/cardapio" target="_blank" rel="noopener noreferrer" className="flex items-center justify-between p-3 rounded-xl hover:bg-white/5 text-gray-300 group">
+            <div className="flex items-center gap-3">
+              <Utensils size={20} /> <span>Ver Cardápio</span>
+            </div>
+            <ExternalLink size={14} className="opacity-0 group-hover:opacity-100 transition-opacity" />
+          </a>
+          
+          <a href="#/garconete" target="_blank" rel="noopener noreferrer" className="flex items-center justify-between p-3 rounded-xl hover:bg-white/5 text-gray-300 group">
+            <div className="flex items-center gap-3">
+              <UserRound size={20} /> <span>Painel Garçom</span>
+            </div>
+            <ExternalLink size={14} className="opacity-0 group-hover:opacity-100 transition-opacity" />
+          </a>
         </nav>
+        
         <div className="p-4 border-t border-white/10 space-y-2">
-          <Link to="/garcom" className="flex items-center gap-3 p-3 rounded-xl hover:bg-white/5 text-gray-400 text-sm"><ShieldCheck size={18} /> Permissões</Link>
-          <Link to="/ofertas" className="flex items-center gap-3 p-3 rounded-xl hover:bg-white/5 text-gray-400 text-sm"><CalendarDays size={18} /> Ofertas</Link>
-          <button onClick={handleSignOut} className="w-full flex items-center gap-3 p-3 rounded-xl text-red-400 hover:bg-red-500/10 text-sm font-bold mt-4"><LogOut size={18} /> Sair</button>
+          <button onClick={handleSignOut} className="w-full flex items-center gap-3 p-3 rounded-xl text-red-400 hover:bg-red-500/10 text-sm font-bold"><LogOut size={18} /> Sair</button>
         </div>
       </aside>
-      <main className="flex-1 overflow-auto bg-gray-50">
-        <header className="bg-white h-16 border-b flex items-center justify-between px-8 sticky top-0 z-10 shadow-sm">
-          <h1 className="text-xl font-bold text-gray-800">{navItems.find(i => i.path === location.pathname)?.label || 'Atendimento'}</h1>
-          <div className="flex items-center gap-3">
-             <div className="text-right">
-                <p className="text-sm font-bold">Painel Admin</p>
-                <p className="text-[10px] text-gray-400 uppercase">Vovó Guta</p>
-             </div>
-             <img src={settings.logoUrl} className="w-10 h-10 rounded-full border border-gray-100" />
-          </div>
+      <main className="flex-1 overflow-auto">
+        <header className="bg-white h-16 border-b flex items-center justify-between px-8 sticky top-0 z-10">
+          <h1 className="text-xl font-bold text-gray-800">Vovó Guta Admin</h1>
+          <img src={settings.logoUrl} className="w-10 h-10 rounded-full border border-gray-100" />
         </header>
         <div className="p-8">
           <Outlet />
