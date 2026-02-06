@@ -12,6 +12,7 @@ export interface Product {
   imageUrl: string;
   isActive: boolean;
   featuredDay?: number;
+  isByWeight?: boolean; // Nova propriedade para venda por KG
 }
 
 export interface OrderItem {
@@ -19,6 +20,7 @@ export interface OrderItem {
   name: string;
   quantity: number;
   price: number;
+  isByWeight?: boolean;
 }
 
 export interface Order {
