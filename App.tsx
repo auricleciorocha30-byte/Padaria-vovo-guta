@@ -12,7 +12,8 @@ import {
   ShieldCheck,
   UserRound,
   ExternalLink,
-  Utensils
+  Utensils,
+  Tv
 } from 'lucide-react';
 import { supabase } from './lib/supabase.ts';
 import { Product, Order, StoreSettings, OrderStatus } from './types.ts';
@@ -116,7 +117,6 @@ export default function App() {
     if (fullError) {
       console.warn('Erro no insert completo, tentando simplificado:', fullError.message);
       
-      // Se falhar por falta de colunas, tenta enviar apenas o básico que costuma ter na tabela padrão
       const simpleOrder = {
         id: order.id,
         items: order.items,
@@ -194,7 +194,7 @@ function AdminLayout({ settings }: { settings: StoreSettings }) {
           </Link>
 
           <div className="pt-6 pb-2 px-3">
-              <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Visualização Externa</p>
+              <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Painéis Externos</p>
           </div>
           
           <a href="#/cardapio" target="_blank" rel="noopener noreferrer" className="flex items-center justify-between p-3 rounded-xl hover:bg-white/5 text-gray-300 group">
@@ -207,6 +207,13 @@ function AdminLayout({ settings }: { settings: StoreSettings }) {
           <a href="#/garconete" target="_blank" rel="noopener noreferrer" className="flex items-center justify-between p-3 rounded-xl hover:bg-white/5 text-gray-300 group">
             <div className="flex items-center gap-3">
               <UserRound size={20} /> <span>Painel Garçom</span>
+            </div>
+            <ExternalLink size={14} className="opacity-0 group-hover:opacity-100 transition-opacity" />
+          </a>
+
+          <a href="#/tv" target="_blank" rel="noopener noreferrer" className="flex items-center justify-between p-3 rounded-xl hover:bg-white/5 text-gray-300 group">
+            <div className="flex items-center gap-3">
+              <Tv size={20} /> <span>Painel TV</span>
             </div>
             <ExternalLink size={14} className="opacity-0 group-hover:opacity-100 transition-opacity" />
           </a>
