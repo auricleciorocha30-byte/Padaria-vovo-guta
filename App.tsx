@@ -13,11 +13,10 @@ import {
   Utensils,
   Tv,
   Users,
-  Menu,
   Zap
 } from 'lucide-react';
 import { supabase } from './lib/supabase.ts';
-import { Product, Order, StoreSettings, OrderStatus } from './types.ts';
+import { Product, Order, StoreSettings } from './types.ts';
 import { INITIAL_SETTINGS } from './constants.ts';
 
 // Pages
@@ -114,30 +113,32 @@ export default function App() {
   }, []);
 
   const addOrder = async (order: Order) => {
-    const payload = {
-      id: order.id,
-      type: order.type || 'BALCAO',
-      items: order.items,
-      total: order.total,
-      status: order.status || 'PREPARANDO',
-      createdAt: order.createdAt || Date.now(),
-      paymentMethod: order.paymentMethod || 'PIX',
+    const { error } = await supabase.from('orders').insert([{
+      ...order,
       tableNumber: order.tableNumber || null,
       notes: order.notes || null,
       customerName: order.customerName || null,
-      deliveryAddress: order.deliveryAddress || null,
-      changeFor: order.changeFor || null
-    };
+      customerPhone: order.customerPhone || null,
+      deliveryAddress: order.deliveryAddress || null
+    }]);
+    if (error) {
+      console.error('Erro ao adicionar pedido:', error);
+      throw error;
+    }
+  };
 
-    const { error } = await supabase.from('orders').insert([payload]);
-    if (error) throw error;
+  const handleSaveProduct = async (p: Product) => {
+    const { error } = await supabase.from('products').upsert(p);
+    if (error) {
+      console.error('Erro ao salvar produto:', error);
+      throw error;
+    }
   };
 
   const handleLogout = () => {
     const wasWaitstaff = isWaitstaff;
     setActiveTable(null);
     setIsWaitstaff(false);
-    // Se era garçom, volta para o painel de mesas. Se era cliente, apenas limpa a sessão no cardápio.
     if (wasWaitstaff) {
         window.location.hash = '/garconete';
     } else {
@@ -153,16 +154,15 @@ export default function App() {
         <Route path="/login" element={session ? <Navigate to="/" /> : <LoginPage />} />
         <Route path="/" element={session ? <AdminLayout settings={settings} /> : <Navigate to="/login" />}>
           <Route index element={<AdminDashboard orders={orders} products={products} />} />
-          <Route path="cardapio-admin" element={<MenuManagement products={products} saveProduct={async (p) => { await supabase.from('products').upsert(p); }} deleteProduct={async (id) => { await supabase.from('products').delete().eq('id', id); }} categories={categories} setCategories={setCategories} />} />
+          <Route path="cardapio-admin" element={<MenuManagement products={products} saveProduct={handleSaveProduct} deleteProduct={async (id) => { await supabase.from('products').delete().eq('id', id); }} categories={categories} setCategories={setCategories} />} />
           <Route path="pedidos" element={<OrdersList orders={orders} updateStatus={async (id, s) => { await supabase.from('orders').update({ status: s }).eq('id', id); }} products={products} addOrder={addOrder} settings={settings} />} />
           <Route path="garcom" element={<WaitstaffManagement settings={settings} onUpdateSettings={async (s) => { await supabase.from('settings').upsert({ id: 'store', data: s }); setSettings(s); }} />} />
-          <Route path="ofertas" element={<WeeklyOffers products={products} saveProduct={async (p) => { await supabase.from('products').upsert(p); }} />} />
+          <Route path="ofertas" element={<WeeklyOffers products={products} saveProduct={handleSaveProduct} />} />
           <Route path="configuracoes" element={<StoreSettingsPage settings={settings} setSettings={async (s) => { await supabase.from('settings').upsert({ id: 'store', data: s }); setSettings(s); }} />} />
         </Route>
         <Route path="/garconete" element={<WaitressPanel orders={orders} onSelectTable={(t) => { setActiveTable(t); setIsWaitstaff(true); }} />} />
         <Route path="/cardapio" element={<DigitalMenu products={products} categories={categories} settings={settings} orders={orders} addOrder={addOrder} tableNumber={activeTable} onLogout={handleLogout} isWaitstaff={isWaitstaff} />} />
         <Route path="/tv" element={<TVBoard orders={orders} settings={settings} products={products} />} />
-        {/* Redireciona qualquer acesso antigo para o cardápio direto */}
         <Route path="/mesa/login" element={<Navigate to="/cardapio" replace />} />
       </Routes>
     </HashRouter>
@@ -184,7 +184,6 @@ function AdminLayout({ settings }: { settings: StoreSettings }) {
 
   return (
     <div className="flex min-h-screen bg-gray-50 pb-20 md:pb-0">
-      {/* Sidebar Desktop */}
       <aside className="w-64 bg-[#3d251e] text-white hidden md:flex flex-col border-r border-gray-800">
         <div className="p-6 flex items-center gap-3 border-b border-white/10">
           <img src={settings.logoUrl} alt="Logo" className="w-10 h-10 rounded-full object-cover border-2 border-orange-500" />
@@ -193,15 +192,10 @@ function AdminLayout({ settings }: { settings: StoreSettings }) {
         <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
           <div className="pb-2 px-3 text-[10px] text-gray-500 font-bold uppercase tracking-widest">Gestão</div>
           {menuItems.map(item => (
-            <Link 
-              key={item.to}
-              to={item.to} 
-              className={`flex items-center gap-3 p-3 rounded-xl transition-all ${location.pathname === item.to ? 'bg-[#f68c3e]' : 'hover:bg-white/5'}`}
-            >
+            <Link key={item.to} to={item.to} className={`flex items-center gap-3 p-3 rounded-xl transition-all ${location.pathname === item.to ? 'bg-[#f68c3e]' : 'hover:bg-white/5'}`}>
               {item.icon} {item.label}
             </Link>
           ))}
-          
           <div className="pt-6 pb-2 px-3 text-[10px] text-gray-500 font-bold uppercase tracking-widest">Operação</div>
           <a href="#/cardapio" target="_blank" className="flex items-center justify-between p-3 rounded-xl hover:bg-white/5 text-gray-300 group"><div className="flex items-center gap-3"><Utensils size={20} /> Cardápio</div><ExternalLink size={14} className="opacity-0 group-hover:opacity-100" /></a>
           <a href="#/garconete" target="_blank" className="flex items-center justify-between p-3 rounded-xl hover:bg-white/5 text-gray-300 group"><div className="flex items-center gap-3"><UserRound size={20} /> Painel Garçom</div><ExternalLink size={14} className="opacity-0 group-hover:opacity-100" /></a>
@@ -213,8 +207,6 @@ function AdminLayout({ settings }: { settings: StoreSettings }) {
           </button>
         </div>
       </aside>
-
-      {/* Main Content Area */}
       <main className="flex-1 overflow-auto">
         <header className="bg-white h-16 border-b flex items-center justify-between px-6 md:px-8 sticky top-0 z-10">
           <div className="flex items-center gap-3 md:hidden">
@@ -222,12 +214,8 @@ function AdminLayout({ settings }: { settings: StoreSettings }) {
              <h1 className="text-sm font-bold text-gray-800">Administração</h1>
           </div>
           <h1 className="text-xl font-bold text-gray-800 hidden md:block">Administração</h1>
-          
           <div className="flex items-center gap-2">
-            <button 
-                onClick={() => setShowQuickLinks(!showQuickLinks)}
-                className="p-2 bg-orange-50 text-orange-600 rounded-xl md:hidden relative"
-            >
+            <button onClick={() => setShowQuickLinks(!showQuickLinks)} className="p-2 bg-orange-50 text-orange-600 rounded-xl md:hidden relative">
                 <Zap size={20} />
                 {showQuickLinks && (
                     <div className="absolute top-full right-0 mt-2 w-56 bg-white shadow-2xl rounded-2xl border border-orange-100 p-2 text-left z-50">
@@ -242,23 +230,14 @@ function AdminLayout({ settings }: { settings: StoreSettings }) {
             <img src={settings.logoUrl} className="w-10 h-10 rounded-full border shadow-sm hidden md:block" />
           </div>
         </header>
-
         <div className="p-4 md:p-8">
           <Outlet />
         </div>
       </main>
-
-      {/* Bottom Nav Mobile */}
       <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 h-20 md:hidden flex items-center justify-around px-2 z-50">
         {menuItems.map(item => (
-          <Link 
-            key={item.to}
-            to={item.to} 
-            className={`flex flex-col items-center gap-1 transition-all px-3 py-2 rounded-xl ${location.pathname === item.to ? 'text-orange-500' : 'text-gray-400'}`}
-          >
-            <div className={location.pathname === item.to ? 'scale-110 transition-transform' : ''}>
-                {item.icon}
-            </div>
+          <Link key={item.to} to={item.to} className={`flex flex-col items-center gap-1 transition-all px-3 py-2 rounded-xl ${location.pathname === item.to ? 'text-orange-500' : 'text-gray-400'}`}>
+            <div className={location.pathname === item.to ? 'scale-110 transition-transform' : ''}>{item.icon}</div>
             <span className="text-[10px] font-bold uppercase tracking-tighter">{item.label}</span>
           </Link>
         ))}
