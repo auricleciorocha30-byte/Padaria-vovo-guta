@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { Product } from '../types';
-import { Plus, Search, Filter, Edit2, Trash2, Camera, Star, CheckCircle, XCircle, Tag, X, CalendarDays } from 'lucide-react';
+import { Plus, Search, Filter, Edit2, Trash2, Camera, Star, CheckCircle, XCircle, Tag, X, CalendarDays, AlignLeft } from 'lucide-react';
 import { Switch } from '../components/Switch';
 
 interface Props {
@@ -37,6 +37,7 @@ const MenuManagement: React.FC<Props> = ({ products, setProducts, categories, se
 
     const productData = {
         ...editingProduct,
+        description: editingProduct.description || '',
         isActive: editingProduct.isActive ?? true,
         featuredDay: editingProduct.featuredDay === -1 ? undefined : editingProduct.featuredDay
     };
@@ -98,7 +99,7 @@ const MenuManagement: React.FC<Props> = ({ products, setProducts, categories, se
         </div>
         <div className="flex flex-col w-full md:w-auto gap-2">
             <button 
-                onClick={() => { setEditingProduct({ category: categories[0] || '', featuredDay: -1, isActive: true }); setShowProductModal(true); }}
+                onClick={() => { setEditingProduct({ category: categories[0] || '', description: '', featuredDay: -1, isActive: true }); setShowProductModal(true); }}
                 className="px-6 py-3 bg-[#f68c3e] text-white font-bold rounded-xl flex items-center justify-center gap-2 hover:bg-orange-600 transition-colors shadow-md"
             >
                 <Plus size={20} /> Novo Produto
@@ -158,7 +159,7 @@ const MenuManagement: React.FC<Props> = ({ products, setProducts, categories, se
               <h2 className="text-xl font-bold">{editingProduct?.id ? 'Editar Produto' : 'Cadastrar Produto'}</h2>
               <button onClick={() => setShowProductModal(false)} className="text-gray-400"><X /></button>
             </div>
-            <form onSubmit={handleSaveProduct} className="p-6 space-y-4">
+            <form onSubmit={handleSaveProduct} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto custom-scrollbar">
               <div className="flex gap-4 items-center mb-4">
                 <div className="w-24 h-24 bg-gray-100 rounded-xl flex flex-col items-center justify-center text-gray-400 border-2 border-dashed border-gray-200 cursor-pointer overflow-hidden relative">
                   {editingProduct?.imageUrl ? (
@@ -191,6 +192,20 @@ const MenuManagement: React.FC<Props> = ({ products, setProducts, categories, se
                     placeholder="Ex: Pão de Leite"
                   />
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase mb-1 flex items-center gap-1">
+                  <AlignLeft size={12} /> Descrição do Produto
+                </label>
+                <textarea 
+                  required
+                  rows={3}
+                  value={editingProduct?.description || ''}
+                  onChange={(e) => setEditingProduct({...editingProduct, description: e.target.value})}
+                  className="w-full p-3 border border-gray-200 rounded-lg outline-none focus:border-orange-500 bg-gray-50/50 resize-none text-sm"
+                  placeholder="Descreva os ingredientes, tamanho ou detalhes especiais..."
+                />
               </div>
 
               <div className="grid grid-cols-2 gap-4">

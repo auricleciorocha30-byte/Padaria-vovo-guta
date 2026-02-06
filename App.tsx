@@ -32,8 +32,8 @@ import LoginPage from './pages/LoginPage.tsx';
 import WaitstaffManagement from './pages/WaitstaffManagement.tsx';
 
 export default function App() {
-  const [products, setProducts] = useState<Product[]>(INITIAL_PRODUCTS);
-  const [categories, setCategories] = useState<string[]>(['Padaria', 'Confeitaria', 'Bebidas', 'Lanches']);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<string[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [settings, setSettings] = useState<StoreSettings>(INITIAL_SETTINGS);
   const [activeTable, setActiveTable] = useState<string | null>(null);
@@ -41,12 +41,13 @@ export default function App() {
   const [authLoading, setAuthLoading] = useState(true);
   const [isWaitstaff, setIsWaitstaff] = useState(false);
 
+  // Initial Fetch and Realtime Subscriptions
   useEffect(() => {
     const fetchInitialData = async () => {
       try {
         const [pRes, cRes, oRes, sRes] = await Promise.all([
-          supabase.from('products').select('*'),
-          supabase.from('categories').select('*'),
+          supabase.from('products').select('*').order('name'),
+          supabase.from('categories').select('*').order('name'),
           supabase.from('orders').select('*').order('createdAt', { ascending: false }),
           supabase.from('settings').select('data').eq('id', 'store').single()
         ]);
@@ -62,6 +63,51 @@ export default function App() {
 
     fetchInitialData();
 
+    // REALTIME SUBSCRIPTIONS
+    const ordersSubscription = supabase
+      .channel('public:orders')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, (payload) => {
+        if (payload.eventType === 'INSERT') {
+          setOrders(prev => [payload.new as Order, ...prev]);
+        } else if (payload.eventType === 'UPDATE') {
+          setOrders(prev => prev.map(o => o.id === payload.new.id ? (payload.new as Order) : o));
+        } else if (payload.eventType === 'DELETE') {
+          setOrders(prev => prev.filter(o => o.id !== payload.old.id));
+        }
+      })
+      .subscribe();
+
+    const productsSubscription = supabase
+      .channel('public:products')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, (payload) => {
+        if (payload.eventType === 'INSERT') {
+          setProducts(prev => [...prev, payload.new as Product]);
+        } else if (payload.eventType === 'UPDATE') {
+          setProducts(prev => prev.map(p => p.id === payload.new.id ? (payload.new as Product) : p));
+        } else if (payload.eventType === 'DELETE') {
+          setProducts(prev => prev.filter(p => p.id !== payload.old.id));
+        }
+      })
+      .subscribe();
+
+    const categoriesSubscription = supabase
+      .channel('public:categories')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'categories' }, () => {
+        // Simpler to refetch categories to maintain order
+        supabase.from('categories').select('name').then(res => {
+          if (res.data) setCategories(res.data.map(c => c.name));
+        });
+      })
+      .subscribe();
+
+    const settingsSubscription = supabase
+      .channel('public:settings')
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'settings', filter: 'id=eq.store' }, (payload) => {
+        setSettings(payload.new.data);
+      })
+      .subscribe();
+
+    // Auth Session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setAuthLoading(false);
@@ -71,22 +117,35 @@ export default function App() {
       setSession(session);
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      subscription.unsubscribe();
+      supabase.removeChannel(ordersSubscription);
+      supabase.removeChannel(productsSubscription);
+      supabase.removeChannel(categoriesSubscription);
+      supabase.removeChannel(settingsSubscription);
+    };
   }, []);
 
   const addOrder = async (order: Order) => {
+    // We only need to push to DB, Realtime listener will update local state
     const { error } = await supabase.from('orders').insert(order);
-    if (!error) setOrders(prev => [order, ...prev]);
+    if (error) console.error('Error adding order:', error);
   };
 
   const updateOrderStatus = async (id: string, status: OrderStatus) => {
     const { error } = await supabase.from('orders').update({ status }).eq('id', id);
-    if (!error) setOrders(prev => prev.map(o => o.id === id ? { ...o, status } : o));
+    if (error) console.error('Error updating order status:', error);
   };
 
   const handleUpdateSettings = async (newSettings: StoreSettings) => {
-    setSettings(newSettings);
+    // Realtime will update local state for all users
     await supabase.from('settings').upsert({ id: 'store', data: newSettings });
+  };
+
+  const updateProductList = async (newList: Product[]) => {
+    // This is handled by each individual product's Realtime sync, 
+    // but we can update state locally for immediate feedback in Admin
+    setProducts(newList);
   };
 
   if (authLoading) {
@@ -104,10 +163,10 @@ export default function App() {
 
         <Route path="/" element={session ? <AdminLayout settings={settings} /> : <Navigate to="/login" />}>
           <Route index element={<AdminDashboard orders={orders} products={products} />} />
-          <Route path="cardapio-admin" element={<MenuManagement products={products} setProducts={setProducts} categories={categories} setCategories={setCategories} />} />
+          <Route path="cardapio-admin" element={<MenuManagement products={products} setProducts={updateProductList} categories={categories} setCategories={setCategories} />} />
           <Route path="pedidos" element={<OrdersList orders={orders} updateStatus={updateOrderStatus} products={products} addOrder={addOrder} settings={settings} />} />
           <Route path="garcom" element={<WaitstaffManagement settings={settings} onUpdateSettings={handleUpdateSettings} />} />
-          <Route path="ofertas" element={<WeeklyOffers products={products} setProducts={setProducts} />} />
+          <Route path="ofertas" element={<WeeklyOffers products={products} setProducts={updateProductList} />} />
           <Route path="configuracoes" element={<StoreSettingsPage settings={settings} setSettings={handleUpdateSettings} />} />
         </Route>
 
