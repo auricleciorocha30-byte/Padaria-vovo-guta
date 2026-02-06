@@ -32,8 +32,8 @@ import LoginPage from './pages/LoginPage.tsx';
 import WaitstaffManagement from './pages/WaitstaffManagement.tsx';
 
 const SOUNDS = {
-  NEW_ORDER: 'https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3', // Som de alerta de novo pedido
-  ORDER_READY: 'https://assets.mixkit.co/active_storage/sfx/951/951-preview.mp3' // NOVO SOM: Sino (Ding) profissional
+  NEW_ORDER: 'https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3',
+  ORDER_READY: 'https://assets.mixkit.co/active_storage/sfx/951/951-preview.mp3'
 };
 
 export default function App() {
@@ -49,9 +49,7 @@ export default function App() {
   const playSound = (url: string) => {
     try {
       const audio = new Audio(url);
-      audio.play().catch(() => {
-        console.log("Áudio bloqueado pelo navegador até a primeira interação do usuário.");
-      });
+      audio.play().catch(() => {});
     } catch (e) {}
   };
 
@@ -87,8 +85,6 @@ export default function App() {
           const updated = payload.new as Order;
           const old = payload.old as Order;
           setOrders(prev => prev.map(o => o.id === updated.id ? updated : o));
-          
-          // Dispara o som se o status mudou para PRONTO agora
           if (updated.status === 'PRONTO' && (old as any).status !== 'PRONTO') {
             playSound(SOUNDS.ORDER_READY);
           }
@@ -136,9 +132,12 @@ export default function App() {
     if (error) throw error;
   };
 
-  const updateOrderStatus = async (id: string, status: OrderStatus) => {
-    const { error } = await supabase.from('orders').update({ status }).eq('id', id);
-    if (error) throw error;
+  const handleLogout = () => {
+    const wasWaitstaff = isWaitstaff;
+    setActiveTable(null);
+    setIsWaitstaff(false);
+    // Redireciona via hash para garantir navegação correta
+    window.location.hash = wasWaitstaff ? '/garconete' : '/mesa/login';
   };
 
   if (authLoading) return <div className="min-h-screen flex items-center justify-center bg-[#fff5e1]"><Loader2 className="animate-spin text-[#3d251e]" size={48} /></div>;
@@ -150,14 +149,14 @@ export default function App() {
         <Route path="/" element={session ? <AdminLayout settings={settings} /> : <Navigate to="/login" />}>
           <Route index element={<AdminDashboard orders={orders} products={products} />} />
           <Route path="cardapio-admin" element={<MenuManagement products={products} saveProduct={async (p) => { await supabase.from('products').upsert(p); }} deleteProduct={async (id) => { await supabase.from('products').delete().eq('id', id); }} categories={categories} setCategories={setCategories} />} />
-          <Route path="pedidos" element={<OrdersList orders={orders} updateStatus={updateOrderStatus} products={products} addOrder={addOrder} settings={settings} />} />
+          <Route path="pedidos" element={<OrdersList orders={orders} updateStatus={async (id, s) => { await supabase.from('orders').update({ status: s }).eq('id', id); }} products={products} addOrder={addOrder} settings={settings} />} />
           <Route path="garcom" element={<WaitstaffManagement settings={settings} onUpdateSettings={async (s) => { await supabase.from('settings').upsert({ id: 'store', data: s }); setSettings(s); }} />} />
           <Route path="ofertas" element={<WeeklyOffers products={products} saveProduct={async (p) => { await supabase.from('products').upsert(p); }} />} />
           <Route path="configuracoes" element={<StoreSettingsPage settings={settings} setSettings={async (s) => { await supabase.from('settings').upsert({ id: 'store', data: s }); setSettings(s); }} />} />
         </Route>
         <Route path="/mesa/login" element={<TableLogin onLogin={(t) => { setActiveTable(t); setIsWaitstaff(false); }} />} />
         <Route path="/garconete" element={<WaitressPanel orders={orders} onSelectTable={(t) => { setActiveTable(t); setIsWaitstaff(true); }} />} />
-        <Route path="/cardapio" element={<DigitalMenu products={products} categories={categories} settings={settings} orders={orders} addOrder={addOrder} tableNumber={activeTable} onLogout={() => { setActiveTable(null); setIsWaitstaff(false); }} isWaitstaff={isWaitstaff} />} />
+        <Route path="/cardapio" element={<DigitalMenu products={products} categories={categories} settings={settings} orders={orders} addOrder={addOrder} tableNumber={activeTable} onLogout={handleLogout} isWaitstaff={isWaitstaff} />} />
         <Route path="/tv" element={<TVBoard orders={orders} settings={settings} products={products} />} />
       </Routes>
     </HashRouter>
@@ -192,10 +191,7 @@ function AdminLayout({ settings }: { settings: StoreSettings }) {
       <main className="flex-1 overflow-auto">
         <header className="bg-white h-16 border-b flex items-center justify-between px-8 sticky top-0 z-10">
           <h1 className="text-xl font-bold text-gray-800">Administração</h1>
-          <div className="flex items-center gap-4">
-            <span className="text-xs font-bold text-gray-400 uppercase hidden md:block">Sistema Ativo</span>
-            <img src={settings.logoUrl} className="w-10 h-10 rounded-full border shadow-sm" />
-          </div>
+          <img src={settings.logoUrl} className="w-10 h-10 rounded-full border shadow-sm" />
         </header>
         <div className="p-8">
           <Outlet />

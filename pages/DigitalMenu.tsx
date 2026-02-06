@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo } from 'react';
-import { ShoppingCart, X, ChevronLeft, Trash2, Plus as PlusIcon, CreditCard, Banknote, QrCode, Utensils, ShoppingBag, Truck, Loader2, Send, Search } from 'lucide-react';
+import { ShoppingCart, X, ChevronLeft, Trash2, Plus as PlusIcon, CheckCircle, Loader2, Send, Search, LayoutGrid, RotateCcw } from 'lucide-react';
 import { Product, StoreSettings, Order, OrderItem, OrderType, PaymentMethod } from '../types';
 
 interface Props {
@@ -17,7 +17,7 @@ interface Props {
 const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories, settings, orders, addOrder, tableNumber, onLogout, isWaitstaff = false }) => {
   const [cart, setCart] = useState<OrderItem[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
-  const [checkoutStep, setCheckoutStep] = useState<'cart' | 'details'>('cart');
+  const [checkoutStep, setCheckoutStep] = useState<'cart' | 'details' | 'success'>('cart');
   const [activeCategory, setActiveCategory] = useState('Todos');
   const [searchTerm, setSearchTerm] = useState('');
   
@@ -61,7 +61,6 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
     
     setIsSending(true);
     
-    // Objeto de pedido com TYPE garantido
     const finalOrder: Order = {
       id: Math.random().toString(36).substr(2, 9).toUpperCase(),
       type: isWaitstaff ? 'MESA' : (orderType || 'BALCAO'), 
@@ -77,10 +76,7 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
     try {
         await addOrder(finalOrder);
         setCart([]);
-        setIsCartOpen(false);
-        setCheckoutStep('cart');
-        alert('✅ Pedido enviado com sucesso!');
-        if (isWaitstaff) onLogout();
+        setCheckoutStep('success');
     } catch (err: any) {
         console.error("Erro no checkout:", err);
         alert(`❌ Falha ao enviar: ${err.message || 'Erro de conexão no banco'}`);
@@ -110,9 +106,8 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
       </header>
 
       <main className="max-w-4xl mx-auto px-4 py-6 space-y-6 pb-20">
-        {/* Busca com Lupa */}
         <div className="relative group">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-orange-500 transition-colors" size={22} />
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-orange-500" size={22} />
           <input 
             type="text" 
             placeholder="Buscar por nome ou descrição..." 
@@ -122,7 +117,6 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
           />
         </div>
 
-        {/* Categorias */}
         <div className="flex gap-2 overflow-x-auto no-scrollbar py-2">
             {categories.map(cat => (
               <button 
@@ -135,7 +129,6 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
             ))}
         </div>
 
-        {/* Lista de Produtos */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {filteredProducts.map(product => (
             <div key={product.id} className="bg-white rounded-[2rem] p-4 shadow-sm flex gap-4 items-center border border-gray-50 hover:border-orange-100 transition-colors">
@@ -152,23 +145,22 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
               </div>
             </div>
           ))}
-          {filteredProducts.length === 0 && (
-            <div className="col-span-full py-10 text-center text-gray-400 font-medium">Nenhum produto encontrado.</div>
-          )}
         </div>
       </main>
 
-      {/* Checkout Modal */}
       {isCartOpen && (
         <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-end sm:items-center justify-center p-4">
           <div className="bg-white w-full max-w-lg rounded-t-[3rem] sm:rounded-[3rem] overflow-hidden flex flex-col max-h-[90vh] shadow-2xl animate-slide-up">
-            <div className="p-8 border-b flex items-center justify-between">
-              <h2 className="font-bold text-xl">{checkoutStep === 'cart' ? 'Sacola de Pedidos' : 'Finalizar Atendimento'}</h2>
-              <button onClick={() => setIsCartOpen(false)} className="p-2 text-gray-400 hover:bg-gray-100 rounded-full"><X size={24} /></button>
-            </div>
+            
+            {checkoutStep !== 'success' && (
+              <div className="p-8 border-b flex items-center justify-between">
+                <h2 className="font-bold text-xl">{checkoutStep === 'cart' ? 'Sacola de Pedidos' : 'Detalhes do Pedido'}</h2>
+                <button onClick={() => setIsCartOpen(false)} className="p-2 text-gray-400 hover:bg-gray-100 rounded-full"><X size={24} /></button>
+              </div>
+            )}
 
             <div className="flex-1 overflow-auto p-8 space-y-6">
-              {checkoutStep === 'cart' ? (
+              {checkoutStep === 'cart' && (
                 <div className="space-y-4">
                   {cart.map(item => (
                     <div key={item.productId} className="flex justify-between items-center bg-gray-50 p-4 rounded-2xl">
@@ -176,9 +168,11 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
                       <button onClick={() => removeFromCart(item.productId)} className="text-red-300 hover:text-red-600"><Trash2 size={18} /></button>
                     </div>
                   ))}
-                  <textarea placeholder="Observações do pedido (ex: sem cebola)..." value={notes} onChange={e => setNotes(e.target.value)} className="w-full p-4 bg-gray-50 border-2 border-gray-100 rounded-2xl outline-none focus:border-orange-500" />
+                  <textarea placeholder="Observações (opcional)..." value={notes} onChange={e => setNotes(e.target.value)} className="w-full p-4 bg-gray-50 border-2 border-gray-100 rounded-2xl outline-none focus:border-orange-500" />
                 </div>
-              ) : (
+              )}
+
+              {checkoutStep === 'details' && (
                 <div className="space-y-6">
                    {!isWaitstaff && (
                     <div className="grid grid-cols-3 gap-2">
@@ -192,24 +186,53 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
                   {orderType === 'MESA' && !tableNumber && <input type="text" placeholder="Número da Mesa" value={manualTable} onChange={e => setManualTable(e.target.value)} className="w-full p-4 bg-gray-50 border-2 border-gray-100 rounded-2xl outline-none focus:border-orange-500" />}
                 </div>
               )}
+
+              {checkoutStep === 'success' && (
+                <div className="flex flex-col items-center justify-center py-10 text-center space-y-6">
+                    <div className="w-24 h-24 bg-green-100 text-green-600 rounded-full flex items-center justify-center animate-bounce">
+                        <CheckCircle size={56} />
+                    </div>
+                    <div>
+                        <h2 className="text-2xl font-bold text-gray-800">Pedido Lançado!</h2>
+                        <p className="text-gray-500 mt-2 px-6">O pedido já foi enviado para a produção na cozinha.</p>
+                    </div>
+                    
+                    <div className="w-full space-y-3 pt-4">
+                        <button 
+                            onClick={() => { setCheckoutStep('cart'); setIsCartOpen(false); }} 
+                            className="w-full py-4 bg-gray-100 text-gray-700 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-gray-200 transition-colors"
+                        >
+                            <RotateCcw size={18} /> Novo pedido nesta mesa
+                        </button>
+                        <button 
+                            onClick={onLogout} 
+                            className={`w-full py-4 text-white rounded-2xl font-bold flex items-center justify-center gap-2 shadow-xl ${isWaitstaff ? 'bg-[#f68c3e]' : 'bg-[#3d251e]'}`}
+                        >
+                            <LayoutGrid size={18} /> {isWaitstaff ? 'Voltar para Mesas' : 'Finalizar e Sair'}
+                        </button>
+                    </div>
+                </div>
+              )}
             </div>
 
-            <div className="p-8 bg-gray-50 border-t">
-              <div className="flex justify-between items-center mb-6">
-                <span className="text-gray-400 text-xs font-bold uppercase tracking-widest">Valor Total</span>
-                <span className="text-3xl font-brand font-bold">R$ {cartTotal.toFixed(2)}</span>
+            {checkoutStep !== 'success' && (
+              <div className="p-8 bg-gray-50 border-t">
+                <div className="flex justify-between items-center mb-6">
+                  <span className="text-gray-400 text-xs font-bold uppercase tracking-widest">Valor Total</span>
+                  <span className="text-3xl font-brand font-bold">R$ {cartTotal.toFixed(2)}</span>
+                </div>
+                <div className="flex gap-2">
+                    {checkoutStep === 'details' && <button onClick={() => setCheckoutStep('cart')} className="px-6 py-4 bg-white border-2 border-gray-100 rounded-2xl"><ChevronLeft/></button>}
+                    <button 
+                      disabled={cart.length === 0 || isSending}
+                      onClick={() => checkoutStep === 'cart' ? (isWaitstaff ? handleCheckout() : setCheckoutStep('details')) : handleCheckout()}
+                      className={`flex-1 py-4 rounded-2xl font-bold text-white shadow-xl flex items-center justify-center gap-2 ${isWaitstaff ? 'bg-[#f68c3e]' : 'bg-[#3d251e]'} disabled:opacity-50`}
+                    >
+                      {isSending ? <Loader2 className="animate-spin"/> : <>{checkoutStep === 'cart' && !isWaitstaff ? 'Próximo Passo' : <><Send size={18}/> {isWaitstaff ? 'Lançar Pedido' : 'Confirmar Pedido'}</>}</>}
+                    </button>
+                </div>
               </div>
-              <div className="flex gap-2">
-                  {checkoutStep !== 'cart' && <button onClick={() => setCheckoutStep('cart')} className="px-6 py-4 bg-white border-2 border-gray-100 rounded-2xl"><ChevronLeft/></button>}
-                  <button 
-                    disabled={cart.length === 0 || isSending}
-                    onClick={() => checkoutStep === 'cart' ? (isWaitstaff ? handleCheckout() : setCheckoutStep('details')) : handleCheckout()}
-                    className={`flex-1 py-4 rounded-2xl font-bold text-white shadow-xl flex items-center justify-center gap-2 ${isWaitstaff ? 'bg-[#f68c3e]' : 'bg-[#3d251e]'} disabled:opacity-50`}
-                  >
-                    {isSending ? <Loader2 className="animate-spin"/> : <>{checkoutStep === 'cart' && !isWaitstaff ? 'Próximo Passo' : <><Send size={18}/> {isWaitstaff ? 'Lançar Pedido' : 'Confirmar Pedido'}</>}</>}
-                  </button>
-              </div>
-            </div>
+            )}
           </div>
         </div>
       )}
