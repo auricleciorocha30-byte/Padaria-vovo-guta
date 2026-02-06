@@ -32,8 +32,8 @@ import LoginPage from './pages/LoginPage.tsx';
 import WaitstaffManagement from './pages/WaitstaffManagement.tsx';
 
 const SOUNDS = {
-  NEW_ORDER: 'https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3',
-  ORDER_READY: 'https://assets.mixkit.co/active_storage/sfx/2218/2218-preview.mp3'
+  NEW_ORDER: 'https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3', // Som de alerta de novo pedido
+  ORDER_READY: 'https://assets.mixkit.co/active_storage/sfx/951/951-preview.mp3' // NOVO SOM: Sino (Ding) profissional
 };
 
 export default function App() {
@@ -49,7 +49,9 @@ export default function App() {
   const playSound = (url: string) => {
     try {
       const audio = new Audio(url);
-      audio.play().catch(() => {});
+      audio.play().catch(() => {
+        console.log("Áudio bloqueado pelo navegador até a primeira interação do usuário.");
+      });
     } catch (e) {}
   };
 
@@ -85,6 +87,8 @@ export default function App() {
           const updated = payload.new as Order;
           const old = payload.old as Order;
           setOrders(prev => prev.map(o => o.id === updated.id ? updated : o));
+          
+          // Dispara o som se o status mudou para PRONTO agora
           if (updated.status === 'PRONTO' && (old as any).status !== 'PRONTO') {
             playSound(SOUNDS.ORDER_READY);
           }
