@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { ShoppingCart, X, ChevronLeft, Trash2, Plus as PlusIcon, CheckCircle, Loader2, Search, Clock, Star, Weight, Ban } from 'lucide-react';
+import { ShoppingCart, X, ChevronLeft, Trash2, Plus as PlusIcon, CheckCircle, Loader2, Search, Clock, Star, Weight, Ban, Moon } from 'lucide-react';
 import { Product, StoreSettings, Order, OrderItem, OrderType, PaymentMethod } from '../types';
 
 interface Props {
@@ -39,6 +39,13 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
   const [customerPhone, setCustomerPhone] = useState('');
   const [deliveryAddress, setDeliveryAddress] = useState('');
 
+  // Verifica se a loja está aberta (pelo menos um canal ativo)
+  const isStoreOpen = useMemo(() => {
+    // A equipe (garçom) sempre pode fazer pedidos mesmo com loja "fechada" para clientes
+    if (isWaitstaff) return true;
+    return settings.isDeliveryActive || settings.isTableOrderActive || settings.isCounterPickupActive;
+  }, [settings, isWaitstaff]);
+
   // Sincroniza o número da mesa se vier da URL ou do garçom
   useEffect(() => {
     if (effectiveTable) {
@@ -46,8 +53,6 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
       setOrderType('MESA');
     }
   }, [effectiveTable]);
-
-  const isStoreOpen = useMemo(() => settings.isDeliveryActive || settings.isTableOrderActive || settings.isCounterPickupActive, [settings]);
 
   const todayOffer = useMemo(() => {
     const today = new Date().getDay();
@@ -135,7 +140,25 @@ const DigitalMenu: React.FC<Props> = ({ products, categories: externalCategories
   const currentWeightInput = parseInt(selectedWeightGrams) || 0;
 
   return (
-    <div className="min-h-screen bg-[#fff5e1] text-[#3d251e]">
+    <div className="min-h-screen bg-[#fff5e1] text-[#3d251e] relative">
+      {/* Overlay de Loja Fechada */}
+      {!isStoreOpen && !isWaitstaff && (
+        <div className="fixed inset-0 z-[100] bg-[#3d251e]/90 backdrop-blur-md flex items-center justify-center p-6">
+            <div className="bg-white w-full max-w-md rounded-[3rem] p-10 text-center space-y-8 animate-scale-up shadow-2xl">
+                <div className="w-24 h-24 bg-orange-100 text-orange-600 rounded-3xl mx-auto flex items-center justify-center shadow-lg rotate-6">
+                    <Moon size={48} />
+                </div>
+                <div className="space-y-4">
+                    <h2 className="text-3xl font-brand font-bold text-[#3d251e]">Loja Fechada</h2>
+                    <p className="text-gray-500 font-medium">No momento não estamos aceitando pedidos online. Por favor, tente novamente mais tarde ou visite nossa loja física.</p>
+                </div>
+                <div className="pt-4 border-t border-gray-100">
+                    <p className="text-[10px] font-black uppercase tracking-[0.3em] text-gray-300">{settings.storeName}</p>
+                </div>
+            </div>
+        </div>
+      )}
+
       <header className={`sticky top-0 z-20 shadow-lg ${isWaitstaff ? 'bg-[#f68c3e]' : 'bg-[#3d251e]'} text-white p-6`}>
         <div className="max-w-4xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-4">
